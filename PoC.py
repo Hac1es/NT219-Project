@@ -12,6 +12,7 @@ def initialize_ckks():
     crypto_context.Enable(fhe.PKESchemeFeature.PKE)
     crypto_context.Enable(fhe.PKESchemeFeature.LEVELEDSHE)
     crypto_context.Enable(fhe.PKESchemeFeature.ADVANCEDSHE)
+    crypto_context.Enable(fhe.PKESchemeFeature.MULTIPARTY)
 
     keys = crypto_context.KeyGen()
     crypto_context.EvalMultKeyGen(keys.secretKey)
@@ -40,7 +41,7 @@ def get_B(crypto_context, S_creditmix, S_incomestability):
         ciphertext=total,
         a=1.0,
         b=3.0,
-        degree=7  # Reduced from 15 to 7 for sqrt
+        degree=15 
     )
     return result
 
@@ -63,7 +64,7 @@ def get_second_param(crypto_context, S_util, S_behavioral, w2=0.30, w7=0.02):
         ciphertext=result,
         a=0.0,
         b=0.3012,
-        degree=7  # Reduced from 15 to 7 for sqrt
+        degree=15
     )
     return result
 
@@ -91,7 +92,7 @@ def get_fourth_param(crypto_context, S_inquiries, S_incomestability, w5=0.05, w6
         ciphertext=S_totalplus,
         a=1.0,
         b=1.08,
-        degree=10  # Keep higher for log function but reduced from 15
+        degree=15
     )
     return result
         
@@ -118,6 +119,8 @@ def homomorphic_credit_score(crypto_context, weights, encrypted_params):
 if __name__ == "__main__":
     # Initialize CKKS
     cc, keys = initialize_ckks()
+    print(keys.publicKey.GetKeyTag())
+    print(keys.secretKey.GetKeyTag())
 
     # Test data for a single user (BatchSize = 1)
     single_user_data = {
