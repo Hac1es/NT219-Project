@@ -1,11 +1,13 @@
 import numpy as np
 import openfhe as fhe
 
-# ==============================================================================
-# CÁC HÀM TÍNH TOÁN ĐỒNG CẤU (GIỮ NGUYÊN)
-# Các hàm này không thay đổi vì chúng hoạt động trên các bản mã,
-# không quan tâm đến việc khóa được tạo ra như thế nào.
-# ==============================================================================
+"""
+==============================================================================
+CÁC HÀM TÍNH TOÁN ĐỒNG CẤU (GIỮ NGUYÊN)
+Các hàm này không thay đổi vì chúng hoạt động trên các bản mã,
+không quan tâm đến việc khóa được tạo ra như thế nào.
+==============================================================================
+"""
 
 def get_A(crypto_context, S_util, S_inquiries):
     S_inquiries_sq = crypto_context.EvalMult(S_inquiries, S_inquiries)
@@ -24,7 +26,6 @@ def get_B(crypto_context, S_creditmix, S_incomestability):
     )
     return result
 
-# ... (Các hàm get_first_param, get_second_param, ... giữ nguyên) ...
 def get_first_param(crypto_context, S_payment, w1=0.35):
     w1_p = crypto_context.MakeCKKSPackedPlaintext([w1])
     S_payment_scaled = crypto_context.EvalMult(S_payment, w1_p)
@@ -59,7 +60,7 @@ def get_third_param(crypto_context, S_length, S_creditmix, B, w3=0.20, w4=0.10):
     S_total = crypto_context.EvalAdd(S_length_scaled, S_creditmix_scaledsqed)
     result = crypto_context.EvalMult(S_total, B_plus_inverse)
     return result
-    
+
 def get_fourth_param(crypto_context, S_inquiries, S_incomestability, w5=0.05, w6=0.03):
     w5_p = crypto_context.MakeCKKSPackedPlaintext([w5])
     w6_p = crypto_context.MakeCKKSPackedPlaintext([w6])
@@ -89,19 +90,20 @@ def homomorphic_credit_score(crypto_context, weights, encrypted_params):
     final_score = weighted_scores[0]
     for score in weighted_scores[1:]:
         final_score = crypto_context.EvalAdd(final_score, score)
-    
+
     A_plus = crypto_context.EvalAdd(A, crypto_context.MakeCKKSPackedPlaintext([1.0]))
     A_plus_inverse = crypto_context.EvalChebyshevFunction(lambda x: 1/x, A_plus, 1, 3, 5)
     final_score = crypto_context.EvalMult(final_score, A_plus_inverse)
     return final_score
 
-# ==============================================================================
-# PHẦN CHÍNH ĐÃ ĐƯỢC SỬA ĐỔI
-# ==============================================================================
+"""
+==============================================================================
+PHẦN CHÍNH ĐÃ ĐƯỢC SỬA ĐỔI
+==============================================================================
+"""
 
 if __name__ == "__main__":
     print("--- THRESHOLD FHE DEMO FOR 5 PARTIES ---")
-    
     # 1. Thiết lập môi trường mã hóa chung
     parameters = fhe.CCParamsCKKSRNS()
     parameters.SetMultiplicativeDepth(15)
@@ -116,11 +118,9 @@ if __name__ == "__main__":
     cc.Enable(fhe.PKESchemeFeature.MULTIPARTY)
 
     print("\nStep 1: Interactive Key Generation for 5 parties")
-    
+
     # Mỗi bên sẽ giữ cặp khóa của riêng mình
     keys = [cc.KeyGen() for _ in range(5)]
-    for key in keys:
-        print(key.Serialize())
 
     # Vòng 1: Bên 1 (A) khởi tạo
     print("  - Party 1 (A) generating initial keys...")
@@ -138,20 +138,20 @@ if __name__ == "__main__":
 
     # Tạo khóa đánh giá phép nhân (EvalMultKey) một cách tương tác
     print("\nStep 2: Interactive Evaluation Key Generation")
-    
+
     # Giai đoạn 1: Tích lũy tiến (Forward accumulation)
     print("  - Forward accumulation phase...")
     eval_mult_keys = []
     # Bên 1 (A) tạo phần khóa đầu tiên
     eval_mult_keys.append(cc.KeySwitchGen(keys[0].secretKey, keys[0].secretKey))
-    
+
     for i in range(1, 5):
         # Bên i+1 tạo phần khóa riêng
         new_key_part = cc.MultiKeySwitchGen(keys[i].secretKey, keys[i].secretKey, eval_mult_keys[i-1])
         # Kết hợp với khóa tích lũy trước đó
         accumulated_key = cc.MultiAddEvalKeys(eval_mult_keys[i-1], new_key_part, keys[i].publicKey.GetKeyTag())
         eval_mult_keys.append(accumulated_key)
-    
+
     # Khóa tích lũy cuối cùng
     eval_mult_ab = eval_mult_keys[-1]
 
@@ -174,7 +174,7 @@ if __name__ == "__main__":
 
     # 2. Dữ liệu đầu vào và mã hóa
     print("\nStep 3: Each party encrypts their data")
-    
+
     # Giả sử mỗi bên cung cấp một phần dữ liệu
     party_data = {
         'S_payment': [0.92],           # Bên 1
@@ -199,7 +199,7 @@ if __name__ == "__main__":
 
     # 4. Giải mã ngưỡng
     print("\nStep 5: Threshold Decryption")
-    
+
     # Mỗi bên tạo ra một bản giải mã một phần
     print("  - Parties generating partial decryptions...")
     partial_decryptions = []
@@ -217,6 +217,6 @@ if __name__ == "__main__":
     # 5. Hiển thị kết quả
     raw_score = result_ptxt.GetRealPackedValue()[0]
     credit_score = 300 + (raw_score * 550)
-    
+
     print("\n--- FINAL RESULT ---")
     print(f"Decrypted Credit Score: {np.round(credit_score, 2)}")

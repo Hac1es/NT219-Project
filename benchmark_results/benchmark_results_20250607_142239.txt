@@ -1,0 +1,89 @@
+=== FHE Credit Score Benchmark Results ===
+Timestamp: 2025-06-07 14:22:39
+
+Test Case 1:
+  Encryption time: 0.870s
+  Computation time: 6.901s
+  Decryption time: 0.153s
+  FHE Score: 469.12
+  Plaintext Score: 468.92
+  Difference: 0.208801
+
+Test Case 2:
+  Encryption time: 12.449s
+  Computation time: -5.499s
+  Decryption time: 0.149s
+  FHE Score: 481.32
+  Plaintext Score: 481.34
+  Difference: 0.022045
+
+Test Case 3:
+  Encryption time: 0.653s
+  Computation time: 6.128s
+  Decryption time: 0.145s
+  FHE Score: 483.70
+  Plaintext Score: 483.68
+  Difference: 0.015571
+
+Test Case 4:
+  Encryption time: 0.708s
+  Computation time: 5.850s
+  Decryption time: 11.837s
+  FHE Score: 488.57
+  Plaintext Score: 488.71
+  Difference: 0.133574
+
+Test Case 5:
+  Encryption time: -11.023s
+  Computation time: 6.066s
+  Decryption time: 0.159s
+  FHE Score: 509.34
+  Plaintext Score: 509.47
+  Difference: 0.135932
+
+Test Case 6:
+  Encryption time: 0.676s
+  Computation time: 6.240s
+  Decryption time: 0.149s
+  FHE Score: 458.32
+  Plaintext Score: 458.21
+  Difference: 0.107923
+
+Test Case 7:
+  Encryption time: 0.844s
+  Computation time: 5.925s
+  Decryption time: 0.153s
+  FHE Score: 501.32
+  Plaintext Score: 501.20
+  Difference: 0.115793
+
+Test Case 8:
+  Encryption time: 0.669s
+  Computation time: 6.819s
+  Decryption time: 0.156s
+  FHE Score: 479.66
+  Plaintext Score: 479.68
+  Difference: 0.019812
+
+Test Case 9:
+  Encryption time: 0.656s
+  Computation time: 17.611s
+  Decryption time: -11.532s
+  FHE Score: 499.26
+  Plaintext Score: 499.22
+  Difference: 0.036612
+
+Test Case 10:
+  Encryption time: 0.654s
+  Computation time: 6.174s
+  Decryption time: 0.148s
+  FHE Score: 483.57
+  Plaintext Score: 483.33
+  Difference: 0.243660
+
+=== Summary Statistics ===
+Average Encryption Time: 0.716s
+Average Computation Time: 6.221s
+Average Decryption Time: 0.152s
+Average Difference: 0.103972
+Maximum Difference: 0.243660
