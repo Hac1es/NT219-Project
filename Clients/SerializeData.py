@@ -18,9 +18,9 @@ class MainWindow(QtWidgets.QMainWindow):
         # Load the UI file
         uic.loadUi("MainWindow.ui", self)
         
-        # Initialize CKKS
+        # Initialize empty objects
         self.cc = None
-        self.keys = None
+        self.keys = type('KeyPair', (), {})()
         
         # Connect signals and slots here
         self.calc_button.clicked.connect(self.calc_data)
@@ -37,25 +37,51 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # Show the window
         self.show()
-    
-    def initialize_ckks(self):
+
+    def initialize_crypto_context(self):
+        """Initialize crypto context with required parameters"""
         parameters = fhe.CCParamsCKKSRNS()
         parameters.SetMultiplicativeDepth(15)
         parameters.SetScalingModSize(59)
-        parameters.SetBatchSize(1) 
+        parameters.SetBatchSize(1)
 
-        crypto_context = fhe.GenCryptoContext(parameters)
-        crypto_context.Enable(fhe.PKESchemeFeature.PKE)
-        crypto_context.Enable(fhe.PKESchemeFeature.LEVELEDSHE)
-        crypto_context.Enable(fhe.PKESchemeFeature.ADVANCEDSHE)
+        self.cc = fhe.GenCryptoContext(parameters)
+        self.cc.Enable(fhe.PKESchemeFeature.PKE)
+        self.cc.Enable(fhe.PKESchemeFeature.LEVELEDSHE)
+        self.cc.Enable(fhe.PKESchemeFeature.ADVANCEDSHE)
+        return self.cc
 
-        return crypto_context
+    def check_required_params(self):
+        """Check if required parameters are loaded"""
+        if not hasattr(self.keys, 'publicKey'):
+            reply = QMessageBox.question(
+                self,
+                "Thiếu tham số",
+                "Chưa load public key. Bạn có muốn load ngay bây giờ không?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self.load_public_key()
+            return False
+
+        if self.cc is None:
+            reply = QMessageBox.question(
+                self,
+                "Thiếu tham số",
+                "Chưa load eval mult key. Bạn có muốn load ngay bây giờ không?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self.load_eval_mult_key()
+            return False
+
+        return True
 
     def generate_and_save_keys(self, bank_name):
         try:
             """Generate new key pair and save to files"""
             self.loading = True
-            self.cc = self.initialize_ckks()
+            self.cc = self.initialize_crypto_context()
             self.keys = self.cc.KeyGen()
             self.cc.EvalMultKeyGen(self.keys.secretKey)
 
@@ -91,36 +117,127 @@ class MainWindow(QtWidgets.QMainWindow):
             QMessageBox.critical(self, "Lỗi", f"Có lỗi xảy ra: {str(e)}")
             return None
 
+    def aggregate_files(self):
+        """Aggregate multiple encrypted files into one"""
+        try:
+            # Chọn các file cần gộp
+            files, _ = QFileDialog.getOpenFileNames(
+                self,
+                "Chọn các file cần gộp",
+                "",
+                "Binary Files (*.bin);;All Files (*)"
+            )
+            
+            if not files:
+                return None
+
+            # Đọc và gộp metadata từ file đầu tiên
+            with open(files[0], 'rb') as f:
+                content = f.read()
+                metadata_end = content.find(b"\n\n")
+                if metadata_end == -1:
+                    raise Exception("Không tìm thấy metadata trong file")
+                metadata = content[:metadata_end + 2]
+
+            # Tạo file mới để ghi kết quả
+            output_file = "aggregated_ciphertext.bin"
+            with open(output_file, 'wb') as out_f:
+                # Ghi metadata
+                out_f.write(metadata)
+
+                # Gộp các ciphertext từ các file
+                seen_ciphertexts = set()
+                for file_path in files:
+                    with open(file_path, 'rb') as f:
+                        content = f.read()
+                        # Bỏ qua metadata
+                        content = content[content.find(b"\n\n") + 2:]
+                        
+                        # Tìm và ghi từng ciphertext
+                        while True:
+                            start = content.find(b"-----BEGIN CIPHERTEXT")
+                            if start == -1:
+                                break
+                            
+                            end = content.find(b"-----END CIPHERTEXT", start)
+                            if end == -1:
+                                break
+                            
+                            # Lấy tên ciphertext
+                            ciphertext_name = content[start:content.find(b"\n", start)].decode('utf-8')
+                            if ciphertext_name not in seen_ciphertexts:
+                                seen_ciphertexts.add(ciphertext_name)
+                                # Ghi toàn bộ ciphertext
+                                out_f.write(content[start:end + len(b"-----END CIPHERTEXT") + 2])
+                            
+                            content = content[end + len(b"-----END CIPHERTEXT") + 2:]
+
+                # Thêm public key và eval mult key
+                if hasattr(self.keys, 'publicKey'):
+                    serialized_public_key = fhe.Serialize(self.keys.publicKey, fhe.BINARY)
+                    out_f.write(b"-----BEGIN PUBLIC KEY-----\n")
+                    out_f.write(serialized_public_key)
+                    out_f.write(b"\n-----END PUBLIC KEY-----\n\n")
+
+                    if self.cc:
+                        eval_mult_key = self.cc.SerializeEvalMultKey("", fhe.BINARY)
+                        if eval_mult_key:
+                            out_f.write(b"-----BEGIN EVAL MULT KEY-----\n")
+                            out_f.write(eval_mult_key)
+                            out_f.write(b"\n-----END EVAL MULT KEY-----\n")
+
+            return output_file
+
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", f"Lỗi khi gộp file: {str(e)}")
+            return None
+
     def calc_data(self):
         try:
+            # Check if required parameters are loaded
+            if not self.check_required_params():
+                return
+
             # Check if keys exist, if not generate new ones
-            if self.keys is None:
+            if not hasattr(self.keys, 'publicKey'):
                 self.loading = True
                 self.generate_and_save_keys(self.selectBank.currentText())
                 QMessageBox.information(self, "Thông báo", "Đã tạo cặp khóa mới")
                 self.loading = False
 
-            # Get values from text fields
-            payment_history = float(self.S_payment.toPlainText() or "0")
-            credit_util = float(self.S_util.toPlainText() or "0")
-            credit_age = float(self.S_length.toPlainText() or "0")
-            credit_mix = float(self.S_creditmix.toPlainText() or "0")
-            credit_inquiries = float(self.S_inquiries.toPlainText() or "0")
-            income_stability = float(self.S_incomestability.toPlainText() or "0")
-            financial_behavior = float(self.S_behavorial.toPlainText() or "0")
+            # Nếu là aggregator, thực hiện gộp file
+            if self.isAggregator.isChecked():
+                output_file = self.aggregate_files()
+                if output_file:
+                    QMessageBox.information(self, "Thành công", f"Đã gộp các file vào {output_file}")
+                return
+
+            # Get values from text fields and only include non-empty ones
+            user_data = {}
+            fields = {
+                'S_payment': self.S_payment.toPlainText(),
+                'S_util': self.S_util.toPlainText(),
+                'S_length': self.S_length.toPlainText(),
+                'S_creditmix': self.S_creditmix.toPlainText(),
+                'S_inquiries': self.S_inquiries.toPlainText(),
+                'S_behavioral': self.S_behavorial.toPlainText(),
+                'S_incomestability': self.S_incomestability.toPlainText()
+            }
+
+            for key, value in fields.items():
+                if value.strip():  # Only include non-empty values
+                    try:
+                        user_data[key] = [float(value)]
+                    except ValueError:
+                        QMessageBox.warning(self, "Cảnh báo", f"Giá trị không hợp lệ cho {key}: {value}")
+                        continue
+
+            if not user_data:
+                QMessageBox.warning(self, "Cảnh báo", "Không có dữ liệu nào để mã hóa")
+                return
+
             customer_name = self.customerName.toPlainText()
             bank_name = self.selectBank.currentText()
-
-            # Prepare data as simple lists
-            user_data = {
-                'S_payment': [payment_history],
-                'S_util': [credit_util],
-                'S_length': [credit_age],
-                'S_creditmix': [credit_mix],
-                'S_inquiries': [credit_inquiries],
-                'S_behavioral': [financial_behavior],
-                'S_incomestability': [income_stability]
-            }
 
             # Encrypt and serialize data
             self.loading = True
@@ -169,17 +286,17 @@ class MainWindow(QtWidgets.QMainWindow):
                     private_key = serialization.load_pem_private_key(f.read(), password=None)
 
                 # Đọc file
-                with open("ciphertext.bin", "rb") as f:
+                with open(f'ciphertext_{bank_name}.bin', "rb") as f:
                     data = f.read()
 
                 # Hash và ký
                 signature = private_key.sign(data, ec.ECDSA(hashes.SHA256()))
 
                 # Lưu chữ ký
-                with open("ciphertext.bin.sig", "wb") as f:
+                with open(f'ciphertext_{bank_name}.bin.sig', "wb") as f:
                     f.write(signature)
 
-                QMessageBox.information(self, "Kết quả", "Đã mã hóa và lưu dữ liệu vào file ciphertext.bin")
+                QMessageBox.information(self, "Kết quả", f"Đã mã hóa và lưu dữ liệu vào file ciphertext_{bank_name}.bin")
             except Exception as e:
                 QMessageBox.critical(self, "Lỗi", f"Không thể lưu file: {str(e)}")
             finally:
@@ -191,17 +308,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def load_public_key(self):
         self.loading = True
-        file_name, _ = QFileDialog.getOpenFileName(self, "Chọn file khóa bí mật", "", "BINARY Files (*.txt);;All Files (*)")
+        file_name, _ = QFileDialog.getOpenFileName(self, "Chọn file khóa công khai", "", "BINARY Files (*.txt);;All Files (*)")
         if file_name:
             try:
-                if self.cc is None:
-                    self.cc = self.initialize_ckks()
                 publicKey, result = fhe.DeserializePublicKey(file_name, fhe.BINARY)
                 if not result:
                     raise Exception("Không thể load public key")
                 
                 # Initialize keys if not exists
-                if self.keys is None:
+                if not hasattr(self.keys, 'publicKey'):
                     self.keys = type('KeyPair', (), {})()
                 self.keys.publicKey = publicKey
                 QMessageBox.information(self, "Thành công", "Đã load public key!")
@@ -214,11 +329,14 @@ class MainWindow(QtWidgets.QMainWindow):
         file_name, _ = QFileDialog.getOpenFileName(self, "Chọn file khóa đa nhân", "", "BINARY Files (*.txt);;All Files (*)")
         if file_name:
             try:
+                # Initialize crypto context if not exists
                 if self.cc is None:
-                    self.cc = self.initialize_ckks()
-                
-                if not self.cc.DeserializeEvalMultKey(file_name, fhe.BINARY):
-                    raise Exception("Không thể load eval mult key")
+                    self.cc = self.initialize_crypto_context()
+
+                with open(file_name, 'rb') as f:
+                    eval_key_bytes = f.read()
+                eval_key = fhe.DeserializeEvalKeyString(eval_key_bytes, fhe.BINARY)
+                self.cc.InsertEvalMultKey([eval_key])
                 QMessageBox.information(self, "Thành công", "Đã load eval mult key!")
             except Exception as e:
                 QMessageBox.critical(self, "Lỗi", f"Không load được eval mult key: {str(e)}")

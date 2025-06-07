@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>902</width>
-    <height>497</height>
+    <height>545</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -507,8 +507,8 @@
    <widget class="QPushButton" name="calc_button">
     <property name="geometry">
      <rect>
-      <x>700</x>
-      <y>350</y>
+      <x>690</x>
+      <y>430</y>
       <width>161</width>
       <height>41</height>
      </rect>
@@ -523,7 +523,7 @@
      <bool>false</bool>
     </property>
     <property name="text">
-     <string>Tính toán</string>
+     <string>Mã hóa</string>
     </property>
    </widget>
    <widget class="QLabel" name="outputShow">
@@ -573,9 +573,9 @@
    <widget class="QPushButton" name="pushButton_4">
     <property name="geometry">
      <rect>
-      <x>330</x>
+      <x>320</x>
       <y>360</y>
-      <width>271</width>
+      <width>281</width>
       <height>31</height>
      </rect>
     </property>
@@ -590,6 +590,25 @@
     </property>
     <property name="text">
      <string>Chọn file khóa nhân đánh giá (.txt)</string>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="isAggregator">
+    <property name="geometry">
+     <rect>
+      <x>630</x>
+      <y>360</y>
+      <width>241</width>
+      <height>31</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>Segoe UI</family>
+      <pointsize>10</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>Là bên mã hóa cuối cùng?</string>
     </property>
    </widget>
   </widget>

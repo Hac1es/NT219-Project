@@ -1,6 +1,3 @@
-import openfhe as fhe
-import os
-
 import os
 import openfhe as fhe
 
@@ -36,13 +33,25 @@ if __name__ == "__main__":
     cc.Enable(fhe.PKESchemeFeature.LEVELEDSHE)
     cc.Enable(fhe.PKESchemeFeature.ADVANCEDSHE)
     cc.Enable(fhe.PKESchemeFeature.MULTIPARTY)
+
+    # Load private key
+    privateKey, result = fhe.DeserializePrivateKey(prv_key_file, fhe.BINARY)
+    if not result:
+        raise Exception("Cannot deserialize private key.")
+
     # === Giải mã kết quả mã hóa liên ngân hàng ===
     encrypted_file = input("Path to the encrypted result file: ").strip()
     if not os.path.exists(encrypted_file):
         raise Exception(f"Encrypted file '{encrypted_file}' does not exist.")
     with open(encrypted_file, 'rb') as f:
         ct_bytes = f.read()
-    encrypted_result = fhe.DeserializeCiphertext(ct_bytes, fhe.BINARY)
+    encrypted_result, result = fhe.DeserializeCiphertext(ct_bytes, fhe.BINARY)
+    if not result:
+        raise Exception(
+            "Error reading serialization of the joint ciphertext"
+        )
+    print("The joint ciphertext has been deserialized.")
+
 
     # Hỏi người dùng là Lead hay Main
     role = input("Are you the 'lead' party for decryption? (y/n): ").strip().lower()
@@ -57,7 +66,8 @@ if __name__ == "__main__":
         f.write(fhe.Serialize(part_decrypt, fhe.BINARY))
     print(f"Your partial decryption saved to: {part_dec_path}")
 
-    # Nếu là bên tập hợp kết quả, thì hỏi các phần khác để ghép
+    # Hỏi người dùng có phải bên tập hợp kết quả không
+    is_aggregator = input("Are you the aggregator party? (y/n): ").strip().lower()
     if is_aggregator == 'y':
         print("Merging all partial decryptions...")
         num_parts = int(input("How many partial decryptions to merge?: "))
@@ -67,15 +77,14 @@ if __name__ == "__main__":
             path = input(f"Path to partial decryption #{i + 1}: ").strip()
             if not os.path.exists(path):
                 raise Exception(f"File '{path}' does not exist.")
-            with open(path, 'rb') as f:
-                part_bytes = f.read()
-            part_ct = fhe.DeserializeCiphertext(part_bytes, fhe.BINARY)
+            part_ct = fhe.DeserializeCiphertext(path, fhe.BINARY)
             part_decryptions.append(part_ct)
 
         # Ghép các phần giải mã lại
         result_ptxt = cc.MultipartyDecryptFusion(part_decryptions)
         result_ptxt.SetLength(1)  # chỉ giải mã một giá trị duy nhất
-        result_vals = result_ptxt.GetRealPackedValue()
-
+        # Trả về kết quả thang 300 - 850
+        raw_score = result_ptxt.GetRealPackedValue()[0]
+        credit_score = 300 + (raw_score * 550)
         print("\n=== Final Decryption Result ===")
-        print("Decrypted value:", result_vals[0])
+        print("Decrypted value:", raw_score)
