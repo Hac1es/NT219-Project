@@ -139,8 +139,7 @@ async def calculate_credit_score(
     S_creditmix: UploadFile = File(...),
     S_inquiries: UploadFile = File(...),
     S_behavioral: UploadFile = File(...),
-    S_incomestability: UploadFile = File(...),
-    weights: str = Form(...)
+    S_incomestability: UploadFile = File(...)
 ):
     temp_dir = tempfile.mkdtemp()
     try:
@@ -201,18 +200,21 @@ async def calculate_credit_score(
                 raise HTTPException(status_code=400, detail="Invalid ciphertext format.")
             encrypted_params[key] = param
 
-        # Parse weights
-        logger.debug("Parsing weights...")
-        try:
-            weights_dict = json.loads(weights)
-            weights_obj = Weights(**weights_dict)
-        except Exception as e:
-            logger.error(f"Error parsing weights: {str(e)}")
-            raise HTTPException(status_code=400, detail=f"Invalid weights format: {str(e)}")
+        # Use hardcoded weights
+        logger.debug("Using preset weights...")
+        weights = {
+            'w1': 0.35,  # Payment history
+            'w2': 0.30,  # Credit utilization
+            'w3': 0.20,  # Length of credit history
+            'w4': 0.10,  # Credit mix
+            'w5': 0.05,  # New credit inquiries
+            'w6': 0.03,  # Income stability
+            'w7': 0.02   # Behavioral factors
+        }
 
         # Calculate homomorphic credit score
         logger.debug("Calculating homomorphic credit score...")
-        encrypted_result = homomorphic_credit_score(cc, weights_obj.model_dump(), encrypted_params)
+        encrypted_result = homomorphic_credit_score(cc, weights, encrypted_params)
 
         # Save result to temporary file
         logger.debug("Saving result...")

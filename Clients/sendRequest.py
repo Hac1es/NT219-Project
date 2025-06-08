@@ -9,8 +9,7 @@ files = {
     'S_creditmix': open('ciphertext_MSB_S_creditmix.txt', 'rb'),
     'S_inquiries': open('ciphertext_TCB_S_inquiries.txt', 'rb'),
     'S_behavioral': open('ciphertext_TCB_S_behavioral.txt', 'rb'),
-    'S_incomestability': open('ciphertext_TCB_S_incomestability.txt', 'rb'),
-    'weights': (None, '{"w1": 0.35, "w2": 0.30, "w3": 0.20, "w4": 0.10, "w5": 0.05, "w6": 0.03, "w7": 0.02}')
+    'S_incomestability': open('ciphertext_TCB_S_incomestability.txt', 'rb')
 }
 
 response = requests.post('http://localhost:8000/calculate-credit-score', files=files)

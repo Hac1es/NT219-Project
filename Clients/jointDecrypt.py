@@ -102,4 +102,4 @@ if __name__ == "__main__":
         raw_score = result_ptxt.GetRealPackedValue()[0]
         credit_score = 300 + (raw_score * 550)
         print("\n=== Final Decryption Result ===")
-        print("Decrypted value:", raw_score)
+        print("Decrypted value:", credit_score)
