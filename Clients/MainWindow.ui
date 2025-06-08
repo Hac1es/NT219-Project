@@ -592,25 +592,6 @@
      <string>Chọn file khóa nhân đánh giá (.txt)</string>
     </property>
    </widget>
-   <widget class="QCheckBox" name="isAggregator">
-    <property name="geometry">
-     <rect>
-      <x>630</x>
-      <y>360</y>
-      <width>241</width>
-      <height>31</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <family>Segoe UI</family>
-      <pointsize>10</pointsize>
-     </font>
-    </property>
-    <property name="text">
-     <string>Là bên mã hóa cuối cùng?</string>
-    </property>
-   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">

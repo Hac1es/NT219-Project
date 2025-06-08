@@ -1,14 +1,32 @@
+"""
+File: calculateJointKey.py
+Mô tả: Tham gia quá trình tạo khóa công khai chung giữa các ngân hàng (Multiparty Public Key Generation)
+Chức năng chính:
+- Nhận public key từ ngân hàng trước đó
+- Sinh đóng góp mới vào public key chung
+- Lưu lại cặp khóa mới (public/private) cho ngân hàng hiện tại
+"""
+
 import os
 import openfhe as fhe
 
 
 def ensure_dir(path):
+    """
+    Hàm tạo thư mục nếu chưa tồn tại
+    Args:
+        path: Đường dẫn thư mục cần tạo
+    """
     if not os.path.exists(path):
         os.makedirs(path)
 
 def save_file(file_path: str, data: bytes) -> None:
-    """Sign the data and save both the data and its signature"""
-    # Save the original data
+    """
+    Lưu dữ liệu vào file
+    Args:
+        file_path: Đường dẫn file cần lưu
+        data: Dữ liệu dạng bytes cần lưu
+    """
     with open(file_path, 'wb') as f:
         f.write(data)
 
@@ -30,16 +48,17 @@ if __name__ == "__main__":
 
     # 1. Thiết lập môi trường mã hóa CKKS
     parameters = fhe.CCParamsCKKSRNS()
-    parameters.SetMultiplicativeDepth(15)
-    parameters.SetScalingModSize(59)
-    parameters.SetBatchSize(1)
+    parameters.SetMultiplicativeDepth(15)  # Độ sâu tối đa cho phép nhân
+    parameters.SetScalingModSize(59)       # Kích thước hệ số tỷ lệ
+    parameters.SetBatchSize(1)             # Số lượng slot xử lý hàng loạt
 
+    # Khởi tạo context mã hóa và bật các tính năng cần thiết
     cc = fhe.GenCryptoContext(parameters)
-    cc.Enable(fhe.PKESchemeFeature.PKE)
-    cc.Enable(fhe.PKESchemeFeature.KEYSWITCH)
-    cc.Enable(fhe.PKESchemeFeature.LEVELEDSHE)
-    cc.Enable(fhe.PKESchemeFeature.ADVANCEDSHE)
-    cc.Enable(fhe.PKESchemeFeature.MULTIPARTY)
+    cc.Enable(fhe.PKESchemeFeature.PKE)           # Mã hóa công khai cơ bản
+    cc.Enable(fhe.PKESchemeFeature.KEYSWITCH)     # Chuyển đổi khóa
+    cc.Enable(fhe.PKESchemeFeature.LEVELEDSHE)    # Mã hóa đồng hình có cấp độ
+    cc.Enable(fhe.PKESchemeFeature.ADVANCEDSHE)   # Mã hóa đồng hình nâng cao
+    cc.Enable(fhe.PKESchemeFeature.MULTIPARTY)    # Hỗ trợ nhiều bên
 
     # 2. Deserialize publicKey của bên trước
     print(f"Loading public key from: {prev_file}")

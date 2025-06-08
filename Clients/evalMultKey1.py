@@ -1,13 +1,31 @@
+"""
+File: evalMultKey1.py
+Mô tả: Tạo khóa đánh giá phép nhân (EvalMultKey) cho mã hóa đồng hình
+Chức năng chính:
+- Giai đoạn 1: Tích lũy tiến (Forward Accumulation)
+- Tạo khóa đánh giá phép nhân cho một bên hoặc nhiều bên
+- Hỗ trợ quá trình tạo khóa chung giữa các ngân hàng
+"""
+
 import os
 import openfhe as fhe
 
 def ensure_dir(path):
+    """
+    Hàm tạo thư mục nếu chưa tồn tại
+    Args:
+        path: Đường dẫn thư mục cần tạo
+    """
     if not os.path.exists(path):
         os.makedirs(path)
 
 def save_file(file_path: str, data: bytes) -> None:
-    """Save data to file"""
-    # Save the original data
+    """
+    Lưu dữ liệu vào file
+    Args:
+        file_path: Đường dẫn file cần lưu
+        data: Dữ liệu dạng bytes cần lưu
+    """
     with open(file_path, 'wb') as f:
         f.write(data)
 
@@ -30,35 +48,38 @@ if __name__ == "__main__":
 
     # Thiết lập môi trường mã hóa CKKS
     parameters = fhe.CCParamsCKKSRNS()
-    parameters.SetMultiplicativeDepth(15)
-    parameters.SetScalingModSize(59)
-    parameters.SetBatchSize(1)
+    parameters.SetMultiplicativeDepth(15)  # Độ sâu tối đa cho phép nhân
+    parameters.SetScalingModSize(59)       # Kích thước hệ số tỷ lệ
+    parameters.SetBatchSize(1)             # Số lượng slot xử lý hàng loạt
 
+    # Khởi tạo context mã hóa và bật các tính năng cần thiết
     cc = fhe.GenCryptoContext(parameters)
-    cc.Enable(fhe.PKESchemeFeature.PKE)
-    cc.Enable(fhe.PKESchemeFeature.KEYSWITCH)
-    cc.Enable(fhe.PKESchemeFeature.LEVELEDSHE)
-    cc.Enable(fhe.PKESchemeFeature.ADVANCEDSHE)
-    cc.Enable(fhe.PKESchemeFeature.MULTIPARTY)
+    cc.Enable(fhe.PKESchemeFeature.PKE)           # Mã hóa công khai cơ bản
+    cc.Enable(fhe.PKESchemeFeature.KEYSWITCH)     # Chuyển đổi khóa
+    cc.Enable(fhe.PKESchemeFeature.LEVELEDSHE)    # Mã hóa đồng hình có cấp độ
+    cc.Enable(fhe.PKESchemeFeature.ADVANCEDSHE)   # Mã hóa đồng hình nâng cao
+    cc.Enable(fhe.PKESchemeFeature.MULTIPARTY)    # Hỗ trợ nhiều bên
 
-    # Load private key
+    # Tải khóa riêng tư
     print(f"Loading your private key from: {prv_key_file}")
     privateKey, result = fhe.DeserializePrivateKey(prv_key_file, fhe.BINARY)
     if not result:
         raise Exception("Cannot deserialize private key.")
 
-    # Hỏi người dùng có phải người khởi tạo đầu tiên không
+    # Xác định xem có phải bên khởi tạo đầu tiên không
     is_starter = input("Are you the first party? (y/n): ").strip().lower()
 
     if is_starter == 'y':
+        # Nếu là bên đầu tiên, tạo EvalMultKey ban đầu
         print("Generating initial EvalMultKey...")
         evalMulKey = cc.KeySwitchGen(privateKey, privateKey)
     else:
-        # Load EvalMultKey trước đó từ file
+        # Nếu không phải bên đầu tiên, tải EvalMultKey trước đó và thêm phần đóng góp
         eval_key_file = input("Input path to previous EvalMultKey: ").strip()
         if not os.path.exists(eval_key_file):
             raise Exception(f"File '{eval_key_file}' does not exist.")
         
+        # Tải và kiểm tra EvalMultKey trước đó
         with open(eval_key_file, 'rb') as f:
             eval_key_str = f.read()
         prev_eval_key = fhe.DeserializeEvalKeyString(eval_key_str, fhe.BINARY)
@@ -69,10 +90,11 @@ if __name__ == "__main__":
         print("Generating EvalMultKey contribution...")
         newKeyPart = cc.MultiKeySwitchGen(privateKey, privateKey, prev_eval_key)
 
+        # Kết hợp các phần khóa
         print("Merging EvalMultKey parts...")
         evalMulKey = cc.MultiAddEvalKeys(prev_eval_key, newKeyPart, privateKey.GetKeyTag())
 
-    # Serialize
+    # Lưu EvalMultKey vào file
     print("Serializing EvalMultKey...")
     eval_key_str = fhe.Serialize(evalMulKey, fhe.BINARY)
     eval_path = os.path.join(key_dir, "evalMultKey.txt")

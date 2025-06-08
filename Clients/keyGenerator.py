@@ -1,14 +1,30 @@
+"""
+File: keyGenerator.py
+Mô tả: Tạo và xuất khóa mã hóa đồng hình (homomorphic encryption) cho các ngân hàng
+Chức năng chính:
+- Tạo cặp khóa công khai và riêng tư sử dụng OpenFHE CKKS
+- Lưu trữ khóa vào thư mục riêng cho từng ngân hàng
+- Hỗ trợ mã hóa số thực và các phép tính xấp xỉ
+"""
+
 import openfhe as fhe
 import os
 
 def ensure_dir(path):
+    """
+    Hàm tạo thư mục nếu chưa tồn tại
+    Args:
+        path: Đường dẫn thư mục cần tạo
+    """
     if not os.path.exists(path):
         os.makedirs(path)
 
 def generate_and_export_keys():
     """
-    Generate and export cryptographic keys for homomorphic encryption using OpenFHE's CKKS scheme.
-    This function creates a crypto context, generates key pairs, and serializes them to files.
+    Tạo và xuất khóa mã hóa đồng hình sử dụng OpenFHE CKKS
+    - Tạo context mã hóa
+    - Tạo cặp khóa
+    - Xuất khóa ra file
     """
      # Nhập tên ngân hàng
     bank_name = input("Input your bank code: ").strip()

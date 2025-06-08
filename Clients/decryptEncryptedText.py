@@ -1,7 +1,21 @@
+"""
+File: decryptEncryptedText.py
+Mô tả: Tham gia quá trình giải mã kết quả mã hóa liên ngân hàng
+Chức năng chính:
+- Giải mã từng phần ciphertext bằng private key của từng ngân hàng
+- Lưu phần giải mã cục bộ
+- Nếu là bên tổng hợp, ghép các phần giải mã để lấy kết quả cuối cùng
+"""
+
 import os
 import openfhe as fhe
 
 def ensure_dir(path):
+    """
+    Hàm tạo thư mục nếu chưa tồn tại
+    Args:
+        path: Đường dẫn thư mục cần tạo
+    """
     if not os.path.exists(path):
         os.makedirs(path)
 
@@ -23,18 +37,19 @@ if __name__ == "__main__":
 
     # Thiết lập môi trường mã hóa CKKS
     parameters = fhe.CCParamsCKKSRNS()
-    parameters.SetMultiplicativeDepth(15)
-    parameters.SetScalingModSize(59)
-    parameters.SetBatchSize(1)
+    parameters.SetMultiplicativeDepth(15)  # Độ sâu tối đa cho phép nhân
+    parameters.SetScalingModSize(59)       # Kích thước hệ số tỷ lệ
+    parameters.SetBatchSize(1)             # Số lượng slot xử lý hàng loạt
 
+    # Khởi tạo context mã hóa và bật các tính năng cần thiết
     cc = fhe.GenCryptoContext(parameters)
-    cc.Enable(fhe.PKESchemeFeature.PKE)
-    cc.Enable(fhe.PKESchemeFeature.KEYSWITCH)
-    cc.Enable(fhe.PKESchemeFeature.LEVELEDSHE)
-    cc.Enable(fhe.PKESchemeFeature.ADVANCEDSHE)
-    cc.Enable(fhe.PKESchemeFeature.MULTIPARTY)
+    cc.Enable(fhe.PKESchemeFeature.PKE)           # Mã hóa công khai cơ bản
+    cc.Enable(fhe.PKESchemeFeature.KEYSWITCH)     # Chuyển đổi khóa
+    cc.Enable(fhe.PKESchemeFeature.LEVELEDSHE)    # Mã hóa đồng hình có cấp độ
+    cc.Enable(fhe.PKESchemeFeature.ADVANCEDSHE)   # Mã hóa đồng hình nâng cao
+    cc.Enable(fhe.PKESchemeFeature.MULTIPARTY)    # Hỗ trợ nhiều bên
 
-    # Load private key
+    # Tải private key
     privateKey, result = fhe.DeserializePrivateKey(prv_key_file, fhe.BINARY)
     if not result:
         raise Exception("Cannot deserialize private key.")
