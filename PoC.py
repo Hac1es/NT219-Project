@@ -1,32 +1,13 @@
 import numpy as np
-import openfhe as fhe 
+import openfhe as fhe
 
-# 1. Khởi tạo CKKS
-def initialize_ckks():
-    parameters = fhe.CCParamsCKKSRNS()
-    parameters.SetMultiplicativeDepth(15)
-    parameters.SetScalingModSize(59)
-    parameters.SetBatchSize(1) 
-
-    crypto_context = fhe.GenCryptoContext(parameters)
-    crypto_context.Enable(fhe.PKESchemeFeature.PKE)
-    crypto_context.Enable(fhe.PKESchemeFeature.LEVELEDSHE)
-    crypto_context.Enable(fhe.PKESchemeFeature.ADVANCEDSHE)
-    crypto_context.Enable(fhe.PKESchemeFeature.MULTIPARTY)
-
-    keys = crypto_context.KeyGen()
-    crypto_context.EvalMultKeyGen(keys.secretKey)
-
-    return crypto_context, keys
-
-# 2. Hàm mã hóa dữ liệu
-def encrypt_data(crypto_context, public_key, data_list):
-    # Đảm bảo data_list là một list, ngay cả khi chỉ có 1 giá trị
-    if not isinstance(data_list, list):
-        data_list = [data_list]
-    plaintext = crypto_context.MakeCKKSPackedPlaintext(data_list)
-    ciphertext = crypto_context.Encrypt(public_key, plaintext)
-    return ciphertext
+"""
+==============================================================================
+CÁC HÀM TÍNH TOÁN ĐỒNG CẤU (GIỮ NGUYÊN)
+Các hàm này không thay đổi vì chúng hoạt động trên các bản mã,
+không quan tâm đến việc khóa được tạo ra như thế nào.
+==============================================================================
+"""
 
 def get_A(crypto_context, S_util, S_inquiries):
     S_inquiries_sq = crypto_context.EvalMult(S_inquiries, S_inquiries)
@@ -41,7 +22,7 @@ def get_B(crypto_context, S_creditmix, S_incomestability):
         ciphertext=total,
         a=1.0,
         b=3.0,
-        degree=15 
+        degree=15
     )
     return result
 
@@ -75,11 +56,11 @@ def get_third_param(crypto_context, S_length, S_creditmix, B, w3=0.20, w4=0.10):
     S_creditmix_scaled = crypto_context.EvalMult(S_creditmix, w4_p)
     S_creditmix_scaledsqed = crypto_context.EvalMult(S_creditmix_scaled, S_creditmix_scaled)
     B_plus = crypto_context.EvalAdd(B, crypto_context.MakeCKKSPackedPlaintext([1.0]))
-    B_plus_inverse = crypto_context.EvalDivide(B_plus, 2, np.sqrt(3) + 1, 7)  # Reduced from 15 to 7
+    B_plus_inverse = crypto_context.EvalChebyshevFunction(lambda x: 1/x, B_plus, 1, 3, 7)
     S_total = crypto_context.EvalAdd(S_length_scaled, S_creditmix_scaledsqed)
     result = crypto_context.EvalMult(S_total, B_plus_inverse)
     return result
-    
+
 def get_fourth_param(crypto_context, S_inquiries, S_incomestability, w5=0.05, w6=0.03):
     w5_p = crypto_context.MakeCKKSPackedPlaintext([w5])
     w6_p = crypto_context.MakeCKKSPackedPlaintext([w6])
@@ -95,7 +76,7 @@ def get_fourth_param(crypto_context, S_inquiries, S_incomestability, w5=0.05, w6
         degree=15
     )
     return result
-        
+
 def homomorphic_credit_score(crypto_context, weights, encrypted_params):
     weighted_scores = []
     A = get_A(crypto_context, encrypted_params['S_util'], encrypted_params['S_inquiries'])
@@ -109,117 +90,133 @@ def homomorphic_credit_score(crypto_context, weights, encrypted_params):
     final_score = weighted_scores[0]
     for score in weighted_scores[1:]:
         final_score = crypto_context.EvalAdd(final_score, score)
-    
+
     A_plus = crypto_context.EvalAdd(A, crypto_context.MakeCKKSPackedPlaintext([1.0]))
-    A_plus_inverse = crypto_context.EvalDivide(A_plus, 1, 3, 5)
+    A_plus_inverse = crypto_context.EvalChebyshevFunction(lambda x: 1/x, A_plus, 1, 3, 5)
     final_score = crypto_context.EvalMult(final_score, A_plus_inverse)
     return final_score
 
-# 4. Ví dụ sử dụng
+"""
+==============================================================================
+PHẦN CHÍNH ĐÃ ĐƯỢC SỬA ĐỔI
+==============================================================================
+"""
+
 if __name__ == "__main__":
-    # Initialize CKKS
-    cc, keys = initialize_ckks()
-    print(keys.publicKey.GetKeyTag())
-    print(keys.secretKey.GetKeyTag())
+    print("--- THRESHOLD FHE DEMO FOR 5 PARTIES ---")
+    # 1. Thiết lập môi trường mã hóa chung
+    parameters = fhe.CCParamsCKKSRNS()
+    parameters.SetMultiplicativeDepth(15)
+    parameters.SetScalingModSize(59)
+    parameters.SetBatchSize(1)
 
-    # Test data for a single user (BatchSize = 1)
-    single_user_data = {
-        'S_payment': [0.92],           # normalized payment history score
-        'S_util': [0.25],              # credit utilization ratio 
-        'S_length': [0.72],            # normalized credit length score
-        'S_creditmix': [0.65],         # normalized credit mix score
-        'S_inquiries': [0.05],         # normalized number of inquiries
-        'S_behavioral': [0.88],        # behavioral score
-        'S_incomestability': [0.75]    # income stability score
+    cc = fhe.GenCryptoContext(parameters)
+    cc.Enable(fhe.PKESchemeFeature.PKE)
+    cc.Enable(fhe.PKESchemeFeature.KEYSWITCH)
+    cc.Enable(fhe.PKESchemeFeature.LEVELEDSHE)
+    cc.Enable(fhe.PKESchemeFeature.ADVANCEDSHE)
+    cc.Enable(fhe.PKESchemeFeature.MULTIPARTY)
+
+    print("\nStep 1: Interactive Key Generation for 5 parties")
+
+    # Mỗi bên sẽ giữ cặp khóa của riêng mình
+    keys = [cc.KeyGen() for _ in range(5)]
+
+    # Vòng 1: Bên 1 (A) khởi tạo
+    print("  - Party 1 (A) generating initial keys...")
+    keys[0] = cc.KeyGen()
+
+    # Các bên còn lại lần lượt tham gia
+    for i in range(1, 5):
+        print(f"  - Party {i+1} joining...")
+        # Bên i+1 nhận khóa công khai chung của i bên trước đó và tham gia
+        keys[i] = cc.MultipartyKeyGen(keys[i-1].publicKey)
+
+    # Khóa công khai chung cuối cùng nằm ở bên cuối cùng
+    joint_public_key = keys[4].publicKey
+    print("Joint Public Key generated successfully.")
+
+    # Tạo khóa đánh giá phép nhân (EvalMultKey) một cách tương tác
+    print("\nStep 2: Interactive Evaluation Key Generation")
+
+    # Giai đoạn 1: Tích lũy tiến (Forward accumulation)
+    print("  - Forward accumulation phase...")
+    eval_mult_keys = []
+    # Bên 1 (A) tạo phần khóa đầu tiên
+    eval_mult_keys.append(cc.KeySwitchGen(keys[0].secretKey, keys[0].secretKey))
+
+    for i in range(1, 5):
+        # Bên i+1 tạo phần khóa riêng
+        new_key_part = cc.MultiKeySwitchGen(keys[i].secretKey, keys[i].secretKey, eval_mult_keys[i-1])
+        # Kết hợp với khóa tích lũy trước đó
+        accumulated_key = cc.MultiAddEvalKeys(eval_mult_keys[i-1], new_key_part, keys[i].publicKey.GetKeyTag())
+        eval_mult_keys.append(accumulated_key)
+
+    # Khóa tích lũy cuối cùng
+    eval_mult_ab = eval_mult_keys[-1]
+
+    # Giai đoạn 2: Hoàn thiện khóa (Backward finalization)
+    print("  - Backward finalization phase...")
+    final_key_parts = []
+    for i in range(5):
+        # Mỗi bên tạo ra thành phần s_i * s_tong
+        part = cc.MultiMultEvalKey(keys[i].secretKey, eval_mult_ab, joint_public_key.GetKeyTag())
+        final_key_parts.append(part)
+        
+    # Kết hợp tất cả các thành phần cuối cùng lại
+    eval_mult_final = final_key_parts[0]
+    for i in range(1, 5):
+        eval_mult_final = cc.MultiAddEvalMultKeys(eval_mult_final, final_key_parts[i], eval_mult_final.GetKeyTag())
+
+    # Nạp khóa đánh giá cuối cùng vào môi trường
+    cc.InsertEvalMultKey([eval_mult_final])
+    print("Joint Evaluation Key generated and inserted.")
+
+    # 2. Dữ liệu đầu vào và mã hóa
+    print("\nStep 3: Each party encrypts their data")
+
+    # Giả sử mỗi bên cung cấp một phần dữ liệu
+    party_data = {
+        'S_payment': [0.92],           # Bên 1
+        'S_util': [0.25],              # Bên 2
+        'S_length': [0.72],            # Bên 3
+        'S_creditmix': [0.65],         # Bên 4
+        'S_inquiries': [0.05],         # Bên 5
+        # Giả sử 2 tham số còn lại do một bên khác (ví dụ bên 1) cung cấp
+        'S_behavioral': [0.88],        # Bên 1
+        'S_incomestability': [0.75]    # Bên 1
     }
 
-    # Complete set of weights according to the formula
-    weights = {
-        'w1': 0.35,  # payment history weight
-        'w2': 0.30,  # utilization weight
-        'w3': 0.20,  # length weight
-        'w4': 0.10,  # credit mix weight
-        'w5': 0.05,  # inquiries weight
-        'w6': 0.03,  # income stability weight
-        'w7': 0.02   # behavioral weight
-    }
+    encrypted_params = {}
+    for key, value in party_data.items():
+        print(f"  - Encrypting {key}...")
+        encrypted_params[key] = cc.Encrypt(joint_public_key, cc.MakeCKKSPackedPlaintext(value))
 
-    print("Encrypting data for single user...")
-    encrypted_params_single = {
-        k: encrypt_data(cc, keys.publicKey, v) for k, v in single_user_data.items()
-    }
+    # 3. Tính toán đồng cấu (thực hiện bởi máy chủ)
+    print("\nStep 4: Homomorphic credit score computation on the server")
+    weights = { 'w1': 0.35, 'w2': 0.30, 'w3': 0.20, 'w4': 0.10, 'w5': 0.05, 'w6': 0.03, 'w7': 0.02 }
+    encrypted_result = homomorphic_credit_score(cc, weights, encrypted_params)
 
-    print("Computing homomorphic credit score...")
-    encrypted_result_single = homomorphic_credit_score(cc, weights, encrypted_params_single)
+    # 4. Giải mã ngưỡng
+    print("\nStep 5: Threshold Decryption")
 
-    print("Decrypting result...")
-    result_ptxt_single = cc.Decrypt(keys.secretKey, encrypted_result_single)
-    result_ptxt_single.SetLength(1)
-    
-    # Convert to 300-850 credit score range
-    raw_score = result_ptxt_single.GetRealPackedValue()[0]
-    credit_score = 300 + (raw_score * 550)  # Map [0,1] to [300,850]
-    
-    print(f"Credit Score (decrypted): {np.round(credit_score, 2)}")
+    # Mỗi bên tạo ra một bản giải mã một phần
+    print("  - Parties generating partial decryptions...")
+    partial_decryptions = []
+    # Bên 1 là "Lead"
+    partial_decryptions.append(cc.MultipartyDecryptLead([encrypted_result], keys[0].secretKey)[0])
+    # Các bên còn lại là "Main"
+    for i in range(1, 5):
+        partial_decryptions.append(cc.MultipartyDecryptMain([encrypted_result], keys[i].secretKey)[0])
 
-    # Multiple users example (sequential because BatchSize = 1)
-    print("\n--- Processing multiple users sequentially (BatchSize = 1) ---")
-    all_users_data = [
-        {
-            'S_payment': [0.92], 'S_util': [0.25], 'S_length': [0.72],
-            'S_creditmix': [0.65], 'S_inquiries': [0.05], 
-            'S_behavioral': [0.88], 'S_incomestability': [0.75]
-        },
-        {
-            'S_payment': [0.85], 'S_util': [0.15], 'S_length': [0.45],
-            'S_creditmix': [0.70], 'S_inquiries': [0.02],
-            'S_behavioral': [0.95], 'S_incomestability': [0.80]
-        },
-        {
-            'S_payment': [0.78], 'S_util': [0.40], 'S_length': [0.90],
-            'S_creditmix': [0.55], 'S_inquiries': [0.08],
-            'S_behavioral': [0.82], 'S_incomestability': [0.65]
-        }
-    ]
+    # Tổng hợp các bản giải mã một phần
+    print("  - Fusing partial decryptions...")
+    result_ptxt = cc.MultipartyDecryptFusion(partial_decryptions)
+    result_ptxt.SetLength(1)
 
-    all_credit_scores = []
-    for i, user_data in enumerate(all_users_data):
-        print(f"\nProcessing user {i+1}:")
-        try:
-            # Encrypt user data
-            encrypted_params = {k: encrypt_data(cc, keys.publicKey, v) 
-                              for k, v in user_data.items()}
-            
-            # Compute encrypted score
-            encrypted_result = homomorphic_credit_score(cc, weights, encrypted_params)
-            
-            # Decrypt and convert to credit score range
-            result_ptxt = cc.Decrypt(keys.secretKey, encrypted_result)
-            result_ptxt.SetLength(1)
-            raw_score = result_ptxt.GetRealPackedValue()[0]
-            credit_score = 300 + (raw_score * 550)
-            
-            all_credit_scores.append(np.round(credit_score, 2))
-            print(f"Credit Score for user {i+1}: {np.round(credit_score, 2)}")
-            
-        except Exception as e:
-            print(f"Error processing user {i+1}: {str(e)}")
+    # 5. Hiển thị kết quả
+    raw_score = result_ptxt.GetRealPackedValue()[0]
+    credit_score = 300 + (raw_score * 550)
 
-    print("\nAll users' credit scores:", all_credit_scores)
-    print("\nProcessing complete!")
-    try:
-        from PoC_numpy import calculate_credit_score_numpy
-        print("\n=== Comparison with NumPy Implementation ===")
-        numpy_score = calculate_credit_score_numpy(single_user_data, weights)
-        print(f"Credit Score (Homomorphic): {np.round(credit_score, 2)}")
-        print(f"Credit Score (NumPy): {numpy_score}")
-        print(f"Difference: {abs(credit_score - numpy_score)}")
-        print("\nComparison for all users:")
-        for i, (homo_score, user_data) in enumerate(zip(all_credit_scores, all_users_data), 1):
-            numpy_score = calculate_credit_score_numpy(user_data, weights)
-            print(f"\nUser {i}:")
-            print(f"Homomorphic: {homo_score}")
-            print(f"NumPy: {numpy_score}")
-            print(f"Difference: {abs(homo_score - numpy_score)}")
-    except ImportError:
-        print("NumPy comparison implementation not found")
+    print("\n--- FINAL RESULT ---")
+    print(f"Decrypted Credit Score: {np.round(credit_score, 2)}")

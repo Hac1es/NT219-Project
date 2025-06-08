@@ -1,0 +1,2 @@
+Bank: TCB
+Customer: Nguyen Viet Tung
