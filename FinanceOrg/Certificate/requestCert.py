@@ -3,15 +3,14 @@ import requests
 import tempfile
 import os
 
-# === 0. Hỏi người dùng nhập các trường cần thiết ===
-print("=== Enter certificate information ===")
-country = input("Country Name (2 letter code) [VN]: ")
-state = input("State or Province Name [HCM]: ")
-org = input("Organization Name [Maritime Bank]: ")
+country = "VN"
+state = "Ho Chi Minh"
+org = "FE Credit"
+commonname = "FECREDIT"
 
 # === 1. Tạo Private Key và CSR ===
 with tempfile.NamedTemporaryFile(suffix=".key", delete=False) as key_file, \
-     tempfile.NamedTemporaryFile(suffix=".csr", delete=True) as csr_file:
+     tempfile.NamedTemporaryFile(suffix=".csr", delete=False) as csr_file:
 
     key_path = key_file.name
     csr_path = csr_file.name
@@ -22,7 +21,7 @@ with tempfile.NamedTemporaryFile(suffix=".key", delete=False) as key_file, \
     ], check=True)
 
     # Ghép chuỗi subject từ input người dùng
-    subject = f"/C={country}/ST={state}/L=ThuDuc/O={org}"
+    subject = f"/C={country}/ST={state}/O={org}/CN={commonname}"
 
     subprocess.run([
         "openssl", "req", "-new", "-key", key_path,
@@ -34,19 +33,16 @@ with tempfile.NamedTemporaryFile(suffix=".key", delete=False) as key_file, \
 with open(csr_path, "rb") as f:
     csr_data = f.read()
 server_IP = input("Input server IP: ")
-SERVER_URL = f"https://{server_IP}:8000"
-CA_CERT = "rootCA.crt"
-SAVE_DIR = "client_cert"
-BANK_CODE = input("Input bank/organization code[ACB]: ")
+SERVER_URL = f"https://{server_IP}:443/submit-csr"
 response = requests.post(
     SERVER_URL,
-    files={"csr": (f"{BANK_CODE}.csr", csr_data, "application/pkcs10")},
-    verify=CA_CERT
+    files={"csr": (f"{commonname}.csr", csr_data, "application/pkcs10")},
+    verify=False
 )
 
 if response.status_code == 200:
-    client_key_path = f"{BANK_CODE}.key"
-    client_crt_path = f"{BANK_CODE}.crt"
+    client_key_path = f"{commonname}.key"
+    client_crt_path = f"{commonname}.crt"
 
     with open(client_key_path, "wb") as f:
         f.write(open(key_path, "rb").read())
@@ -56,6 +52,8 @@ if response.status_code == 200:
 
     print(f"Certificate request complete!")
     print(f"Private key: {client_key_path}")
+    os.remove(csr_path)
 else:
     print(f"Certificate request failed: {response.status_code}")
     print(response.text)
+    os.remove(csr_path)
