@@ -40,5 +40,6 @@ async def handle_csr(csr: UploadFile = File(...)):
     finally:
         csr.file.close()
         if os.path.exists(csr_path): os.remove(csr_path)
+        if os.path.exists("sbvCert.srl"): os.remove("sbvCert.srl")
 
 
