@@ -57,7 +57,10 @@ with open(csr_path, "rb") as f:
 SERVER_URL = f"https://{server_domain}:443/submit-csr"
 response = requests.post(
     SERVER_URL,
-    files={"csr": (f"{commonname}.csr", csr_data, "application/pkcs10")},
+    files = {
+    "csr": (f"{commonname}.csr", open(csr_path, "rb"), "application/pkcs10"),
+    "config": (f"{commonname}.cnf", open(config_path, "rb"), "text/plain")
+    },
     verify="./RootCA.crt"
 )
 
