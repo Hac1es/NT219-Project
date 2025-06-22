@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastapi.responses import FileResponse
 import subprocess
 import tempfile
@@ -6,6 +6,17 @@ import shutil
 import os
 
 app = FastAPI()
+
+# Danh sách IP cho phép: MSB, TCB, FECREDIT
+ALLOWED_IPS = {"192.168.1.11", "192.168.1.12", "192.168.1.14"}  
+
+@app.middleware("http")
+async def verify_client_ip(request: Request, call_next):
+    client_ip = request.client.host
+    if client_ip not in ALLOWED_IPS:
+        raise HTTPException(status_code=403, detail="Forbidden: IP not allowed")
+    response = await call_next(request)
+    return response
 
 @app.post("/submit-csr")
 async def handle_csr(csr: UploadFile = File(...)):
@@ -23,7 +34,7 @@ async def handle_csr(csr: UploadFile = File(...)):
         subprocess.run([
             "openssl", "x509", "-req",
             "-in", csr_path,
-            "-CA", "sbvCert.crt",
+            "-CA", "rootCA.crt",
             "-CAkey", "rootCA.key",
             "-CAcreateserial",
             "-out", cert_path,

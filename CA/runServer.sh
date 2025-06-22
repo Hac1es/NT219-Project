@@ -7,8 +7,8 @@ source ../venv/bin/activate
 APP_MODULE="server:app"
 HOST="0.0.0.0"
 PORT=443
-CERT="sbvCert.crt"
-KEY="rootCA.key"
+CERT="sbv.org.crt"
+KEY="sbv.org.key"
 IP_ADDR=$(hostname -I | awk '{print $1}')  # lấy IP đầu tiên trong dãy IP nội bộ
 
 # ========================
