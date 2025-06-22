@@ -1,23 +1,48 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
-from pydantic import BaseModel
+import os
+import json
+import base64
+import shutil
+import tempfile
+import logging
+import traceback
+from pathlib import Path
+from typing import Dict, List, Any
+
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from fastapi.responses import Response, JSONResponse
+
 import openfhe as fhe
 import numpy as np
-from typing import Dict, List
-import base64
-import json
-import os
-from fastapi.responses import Response
-import tempfile
-import traceback
-import logging
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.exceptions import InvalidSignature
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
+# --- CONFIGURATION ---
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Homomorphic Credit Score Server")
+app = FastAPI(title="Secure Homomorphic Credit Score Server")
 
-# Import homomorphic computation functions from PoC_new.py
+CUSTOM_CA_PATH = "./Certificate/RootCA.crt" 
+if not os.path.exists(CUSTOM_CA_PATH):
+    raise FileNotFoundError(f"RootCA file not found at: {CUSTOM_CA_PATH}")
+
+# --- SECURITY VERIFICATION FUNCTIONS ---
+def verify_certificate_signed_by_root(cert: x509.Certificate, root_cert: x509.Certificate) -> bool:
+    try:
+        root_pubkey = root_cert.public_key()
+        root_pubkey.verify(
+            cert.signature,
+            cert.tbs_certificate_bytes,
+            ec.ECDSA(cert.signature_hash_algorithm)
+        )
+        return True
+    except Exception:
+        return False
+
+# --- HOMOMORPHIC COMPUTATION FUNCTIONS (Không thay đổi) ---
+# ... (Giữ nguyên toàn bộ các hàm get_A, get_B, get_first_param, etc.)
 def get_A(crypto_context, S_util, S_inquiries):
     S_inquiries_sq = crypto_context.EvalMult(S_inquiries, S_inquiries)
     result = crypto_context.EvalAdd(S_util, S_inquiries_sq)
@@ -104,13 +129,11 @@ def homomorphic_credit_score(crypto_context, weights, encrypted_params):
     final_score = crypto_context.EvalMult(final_score, A_plus_inverse)
     return final_score
 
-# Initialize crypto context
 def init_crypto_context():
     parameters = fhe.CCParamsCKKSRNS()
     parameters.SetMultiplicativeDepth(15)
     parameters.SetScalingModSize(59)
     parameters.SetBatchSize(1)
-
     cc = fhe.GenCryptoContext(parameters)
     cc.Enable(fhe.PKESchemeFeature.PKE)
     cc.Enable(fhe.PKESchemeFeature.KEYSWITCH)
@@ -119,152 +142,139 @@ def init_crypto_context():
     cc.Enable(fhe.PKESchemeFeature.MULTIPARTY)
     return cc
 
-# Pydantic models for request validation
-class Weights(BaseModel):
-    w1: float = 0.35
-    w2: float = 0.30
-    w3: float = 0.20
-    w4: float = 0.10
-    w5: float = 0.05
-    w6: float = 0.03
-    w7: float = 0.02
-
+# --- MAIN API ENDPOINT ---
 @app.post("/calculate-credit-score")
 async def calculate_credit_score(
-    public_key: UploadFile = File(...),
-    eval_mult_key: UploadFile = File(...),
-    S_payment: UploadFile = File(...),
-    S_util: UploadFile = File(...),
-    S_length: UploadFile = File(...),
-    S_creditmix: UploadFile = File(...),
-    S_inquiries: UploadFile = File(...),
-    S_behavioral: UploadFile = File(...),
-    S_incomestability: UploadFile = File(...)
+    public_key: UploadFile = File(...), eval_mult_key: UploadFile = File(...),
+    S_payment: UploadFile = File(...), S_util: UploadFile = File(...), S_length: UploadFile = File(...),
+    S_creditmix: UploadFile = File(...), S_inquiries: UploadFile = File(...),
+    S_behavioral: UploadFile = File(...), S_incomestability: UploadFile = File(...),
+    certificate: UploadFile = File(...),
+    signature: str = Form(...),
+    metadata: str = Form("{}")
 ):
-    temp_dir = tempfile.mkdtemp()
+    logger.info("Received request for credit score calculation.")
+    
+    # Gom tất cả các file dữ liệu FHE vào một dict riêng
+    fhe_data_files = {
+        'public_key': public_key, 'eval_mult_key': eval_mult_key,
+        'S_payment': S_payment, 'S_util': S_util, 'S_length': S_length,
+        'S_creditmix': S_creditmix, 'S_inquiries': S_inquiries,
+        'S_behavioral': S_behavioral, 'S_incomestability': S_incomestability
+    }
+
+    # Đọc nội dung file
+    file_contents: Dict[str, bytes] = {}
     try:
-        logger.debug("Starting credit score calculation...")
-        logger.debug(f"Created temp directory: {temp_dir}")
+        # Đọc các file dữ liệu FHE
+        for key, upload_file in fhe_data_files.items():
+            file_contents[key] = await upload_file.read()
         
-        # Save uploaded files
-        public_key_path = os.path.join(temp_dir, "public_key.txt")
-        eval_mult_key_path = os.path.join(temp_dir, "eval_mult_key.txt")
-        
-        # Save main files
-        logger.debug("Saving public key and eval mult key...")
-        with open(public_key_path, "wb") as f:
-            f.write(await public_key.read())
-        with open(eval_mult_key_path, "wb") as f:
-            f.write(await eval_mult_key.read())
+        # Đọc riêng file certificate và metadata
+        cert_pem_bytes = await certificate.read()
+        metadata_dict = json.loads(metadata)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid file or metadata format.")
 
-        # Initialize crypto context
-        logger.debug("Initializing crypto context...")
+    # === LỚP BẢO VỆ 1: XÁC THỰC CERTIFICATE ===
+    logger.info("Verifying sender's certificate...")
+    try:
+        cert = x509.load_pem_x509_certificate(cert_pem_bytes)
+        client_public_key = cert.public_key()
+
+        if not isinstance(client_public_key, ec.EllipticCurvePublicKey):
+            raise HTTPException(status_code=400, detail="Certificate must use an Elliptic Curve key.")
+
+        with open(CUSTOM_CA_PATH, "rb") as f:
+            root_cert = x509.load_pem_x509_certificate(f.read())
+
+        if not verify_certificate_signed_by_root(cert, root_cert):
+            logger.warning("Certificate verification failed: Not signed by trusted RootCA.")
+            raise HTTPException(status_code=403, detail="Certificate not signed by the trusted RootCA.")
+        
+        logger.info("Certificate is valid and trusted.")
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Error processing certificate: {e}")
+        raise HTTPException(status_code=400, detail=f"Certificate processing error: {e}")
+
+    # === LỚP BẢO VỆ 2: XÁC MINH CHỮ KÝ SỐ (ĐÃ SỬA LẠI LOGIC) ===
+    logger.info("Verifying digital signature...")
+    try:
+        # SỬA ĐỔI CHÍNH Ở ĐÂY
+        # Tái tạo dữ liệu đã ký, chỉ bao gồm các file dữ liệu FHE, KHÔNG BAO GỒM certificate.
+        data_to_verify = b''
+        # Sắp xếp các key của file dữ liệu để đảm bảo thứ tự nhất quán
+        for key in sorted(file_contents.keys()):
+            data_to_verify += file_contents[key]
+        
+        # Thêm metadata đã được chuẩn hóa vào cuối
+        data_to_verify += json.dumps(metadata_dict, sort_keys=True).encode('utf-8')
+        
+        decoded_sig = base64.b64decode(signature)
+
+        client_public_key.verify( # Dùng public key từ certificate đã được xác thực
+            decoded_sig,
+            data_to_verify,
+            ec.ECDSA(hashes.SHA256())
+        )
+        logger.info("Digital signature is valid.")
+    except InvalidSignature:
+        logger.warning("Signature verification failed: Invalid signature.")
+        raise HTTPException(status_code=403, detail="Invalid digital signature.")
+    except Exception as e:
+        logger.error(f"Error verifying signature: {e}")
+        raise HTTPException(status_code=400, detail=f"Error during signature verification: {e}")
+
+    # === BẮT ĐẦU XỬ LÝ FHE (SAU KHI ĐÃ AN TOÀN) ===
+    logger.info("Security checks passed. Starting homomorphic computation.")
+    try:
         cc = init_crypto_context()
-
-        # Load public key
-        logger.debug("Loading public key...")
-        public_key, success = fhe.DeserializePublicKey(public_key_path, fhe.BINARY)
-        if not success:
-            raise HTTPException(status_code=400, detail="Invalid public key")
-
-        # Load evaluation multiplication key
-        logger.debug("Loading evaluation multiplication key...")
-        with open(eval_mult_key_path, 'rb') as f:
-            eval_key_str = f.read()
-        eval_mult_key = fhe.DeserializeEvalKeyString(eval_key_str, fhe.BINARY)
-        if not isinstance(eval_mult_key, fhe.EvalKey):
-            raise HTTPException(status_code=400, detail="Invalid evaluation multiplication key")
-
-        # Insert evaluation key into context
-        logger.debug("Inserting evaluation key into context...")
+        fhe_pk, success = fhe.DeserializePublicKeyString(file_contents['public_key'], fhe.BINARY)
+        if not success: raise ValueError("Invalid FHE public key")
+        
+        eval_mult_key = fhe.DeserializeEvalKeyString(file_contents['eval_mult_key'], fhe.BINARY)
+        if not isinstance(eval_mult_key, fhe.EvalKey): raise ValueError("Invalid FHE evaluation key")
         cc.InsertEvalMultKey([eval_mult_key])
-
-        # Load encrypted parameters
-        logger.debug("Loading encrypted parameters...")
-        encrypted_params = {}
-        param_files = {
-            'S_payment': S_payment,
-            'S_util': S_util,
-            'S_length': S_length,
-            'S_creditmix': S_creditmix,
-            'S_inquiries': S_inquiries,
-            'S_behavioral': S_behavioral,
-            'S_incomestability': S_incomestability
-        }
-
-        for key, file in param_files.items():
-            logger.debug(f"Processing parameter: {key}")
-            param_data = await file.read()
-            param = fhe.DeserializeCiphertextString(param_data, fhe.BINARY)
-            if not isinstance(param, fhe.Ciphertext):
-                raise HTTPException(status_code=400, detail="Invalid ciphertext format.")
+        
+        encrypted_params: Dict[str, Any] = {}
+        for key in [k for k in file_contents.keys() if k.startswith('S_')]:
+            param = fhe.DeserializeCiphertextString(file_contents[key], fhe.BINARY)
+            if not isinstance(param, fhe.Ciphertext): raise ValueError(f"Invalid ciphertext for {key}")
             encrypted_params[key] = param
 
-        # Use hardcoded weights
-        logger.debug("Using preset weights...")
         weights = {
-            'w1': 0.35,  # Payment history
-            'w2': 0.30,  # Credit utilization
-            'w3': 0.20,  # Length of credit history
-            'w4': 0.10,  # Credit mix
-            'w5': 0.05,  # New credit inquiries
-            'w6': 0.03,  # Income stability
-            'w7': 0.02   # Behavioral factors
+            'w1': 0.35, 'w2': 0.30, 'w3': 0.20, 'w4': 0.10, 
+            'w5': 0.05, 'w6': 0.03, 'w7': 0.02
         }
 
-        # Calculate homomorphic credit score
-        logger.debug("Calculating homomorphic credit score...")
+        logger.info("Calculating final encrypted score...")
         encrypted_result = homomorphic_credit_score(cc, weights, encrypted_params)
 
-        # Save result to temporary file
-        logger.debug("Saving result...")
-        result_path = os.path.join(temp_dir, "result.bin")
-        logger.debug(f"Result path: {result_path}")
+        result_data = fhe.Serialize(encrypted_result, fhe.BINARY)
+        if not result_data:
+            raise HTTPException(status_code=500, detail="Failed to serialize FHE result.")
         
-        try:
-            result_data = fhe.Serialize(encrypted_result, fhe.BINARY)
-            if not result_data:
-                logger.error("Failed to serialize result - result_data is None")
-                raise HTTPException(status_code=500, detail="Failed to serialize result")
-            
-            logger.debug(f"Writing {len(result_data)} bytes to result file")
-            with open(result_path, "wb") as f:
-                f.write(result_data)
-            
-            if not os.path.exists(result_path):
-                logger.error(f"Result file was not created at {result_path}")
-                raise HTTPException(status_code=500, detail="Failed to create result file")
-            
-            logger.debug(f"Result file created successfully at {result_path}")
-            
-            # Read the file content
-            with open(result_path, "rb") as f:
-                content = f.read()
-            
-            # Return the content directly
-            logger.debug("Returning result content...")
-            return Response(
-                content=content,
-                media_type="application/octet-stream",
-                headers={
-                    "Content-Disposition": "attachment; filename=encrypted_result.bin"
-                }
-            )
-
-        except Exception as e:
-            logger.error(f"Error during result serialization/saving: {str(e)}")
-            logger.error(traceback.format_exc())
-            raise HTTPException(status_code=500, detail=f"Error processing result: {str(e)}")
+        logger.info("Computation successful. Returning encrypted result.")
+        return Response(
+            content=result_data,
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": "attachment; filename=encrypted_result.bin"}
+        )
 
     except Exception as e:
-        logger.error(f"Error in calculate_credit_score: {str(e)}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        # Clean up temp directory
-        import shutil
-        shutil.rmtree(temp_dir, ignore_errors=True)
+        logger.error(f"Error during FHE processing: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"An error occurred during homomorphic computation: {e}")
 
+# --- KHỞI CHẠY SERVER VỚI HTTPS ---
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="debug") 
+    uvicorn.run(
+        app, 
+        host="0.0.0.0", 
+        port=8000, 
+        log_level="info",
+        ssl_keyfile="./Certificate/FECREDIT.key",
+        ssl_certfile="./Certificate/FECREDIT.crt"
+    )

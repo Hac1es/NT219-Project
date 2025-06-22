@@ -78,12 +78,7 @@ async def upload_file(
 
     # Step 4: Lưu file và metadata
     try:
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        subject = cert.subject
-        cn_attr = subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)
-        bank_cn = cn_attr[0].value if cn_attr else "unknown"
-
-        filename_base = f"{timestamp}_{bank_cn}_{file.filename}"
+        filename_base = f"{file.filename}"
         file_path = UPLOAD_DIR / filename_base
         metadata_path = file_path.with_suffix(".json")
 
