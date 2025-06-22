@@ -12,7 +12,8 @@ URL_MAPPER = {
     "ACB": "192.168.1.12"
 }
 BANK_CODE = "MSB"  # Mã ngân hàng của bạn
-SERVER_URL = f"https://{URL_MAPPER[BANK_CODE]}/upload" 
+BANK_TARGET="ACB"
+SERVER_URL = f"https://{URL_MAPPER[BANK_TARGET]}/upload" 
 
 # === INPUT FILE ===
 file_path = input("Input file path: ").strip()

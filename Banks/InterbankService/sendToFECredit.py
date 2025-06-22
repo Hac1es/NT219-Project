@@ -8,7 +8,7 @@ from cryptography import x509
 
 # === CẤU HÌNH ===
 URL_MAPPER = {
-    "FECREDIT": "http://localhost:8000" # Sửa lại thành URL của server nhận
+    "FECREDIT": "https://192.168.1.14:8000" # Sửa lại thành URL của server nhận
 }
 # Endpoint trên server nhận
 API_ENDPOINT = "/calculate-credit-score"

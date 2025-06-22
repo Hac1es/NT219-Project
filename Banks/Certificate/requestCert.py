@@ -4,10 +4,10 @@ import tempfile
 import os
 
 country = "VN"
-state = "Ho Chi Minh"
-org = "A Chau Bank"
-commonname = "ACB"
-public_ip = "192.168.1.12"
+state = "Ha Noi"
+org = "Maritime Bank"
+commonname = "MSB"
+public_ip = "192.168.1.11"
 server_domain = "www.sbv.org"
 
 # === 1. Tạo file config tạm có SAN ===

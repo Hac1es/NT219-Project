@@ -10,15 +10,6 @@ Chức năng chính:
 import os
 import openfhe as fhe
 
-def ensure_dir(path):
-    """
-    Hàm tạo thư mục nếu chưa tồn tại
-    Args:
-        path: Đường dẫn thư mục cần tạo
-    """
-    if not os.path.exists(path):
-        os.makedirs(path)
-
 def save_file(file_path: str, data: bytes) -> None:
     """
     Lưu dữ liệu vào file
@@ -34,12 +25,8 @@ if __name__ == "__main__":
     print("--- Stage 2: Backward Finalization ---")
 
     # Nhập tên ngân hàng
-    bank_name = input("Input your bank code: ").strip()
-    if not bank_name:
-        raise Exception("Bank name cannot be empty.")
-
-    key_dir = f'keys_{bank_name}'
-    ensure_dir(key_dir)
+    bank_name = "MSB"
+    key_dir = 'Keys'
 
     # Nhập các đường dẫn file cần thiết
     eval_key_file = input("Input path to current accumulated EvalMultKey file: ").strip()
