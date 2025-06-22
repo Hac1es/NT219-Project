@@ -1,11 +1,9 @@
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.responses import JSONResponse
 from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.exceptions import InvalidSignature
 from cryptography import x509
-from certvalidator import CertificateValidator, ValidationContext
-from asn1crypto import pem
 import base64, json
 from pathlib import Path
 from datetime import datetime
@@ -14,8 +12,22 @@ app = FastAPI()
 UPLOAD_DIR = Path("Received")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-# Path tới CA bundle của hệ thống Linux
-SYSTEM_CA_BUNDLE = "/etc/ssl/certs/ca-certificates.crt"
+# Custom CA (Root CA) của bạn
+CUSTOM_CA_PATH = "./RootCA.crt"
+
+def verify_certificate_signed_by_root(cert: x509.Certificate, root_cert: x509.Certificate):
+    try:
+        # Lấy public key của RootCA
+        root_pubkey = root_cert.public_key()
+        # Verify cert được ký bởi RootCA
+        root_pubkey.verify(
+            cert.signature,
+            cert.tbs_certificate_bytes,
+            ec.ECDSA(cert.signature_hash_algorithm)
+        )
+        return True
+    except Exception:
+        return False
 
 @app.post("/upload")
 async def upload_file(
@@ -31,32 +43,23 @@ async def upload_file(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid file or metadata.")
 
-    # Step 2: Load certificate và verify chain-of-trust
+    # Step 2: Load cert và verify bằng RootCA
     try:
         cert_pem = await certificate.read()
-
-        # Chuyển sang DER nếu là PEM
-        if pem.detect(cert_pem):
-            _, _, cert_der = pem.unarmor(cert_pem)
-        else:
-            cert_der = cert_pem
-
-        # Tạo context dùng CA hệ thống để verify chain-of-trust
-        with open(SYSTEM_CA_BUNDLE, "rb") as f:
-            trusted_ca = f.read()
-
-        context = ValidationContext(trust_roots=[trusted_ca])
-        validator = CertificateValidator(cert_der, validation_context=context)
-        validator.validate_usage(set(["digital_signature"]))
-
-        # Load lại thành cryptography.x509 để lấy public key
         cert = x509.load_pem_x509_certificate(cert_pem)
         public_key = cert.public_key()
 
         if not isinstance(public_key, ec.EllipticCurvePublicKey):
-            raise ValueError("Certificate must use EC key")
+            raise HTTPException(status_code=400, detail="Certificate must use EC key.")
+
+        with open(CUSTOM_CA_PATH, "rb") as f:
+            root_cert_pem = f.read()
+            root_cert = x509.load_pem_x509_certificate(root_cert_pem)
+
+        if not verify_certificate_signed_by_root(cert, root_cert):
+            raise HTTPException(status_code=403, detail="Certificate not signed by trusted RootCA.")
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid certificate or trust validation failed: {e}")
+        raise HTTPException(status_code=400, detail=f"Certificate error: {e}")
 
     # Step 3: Verify chữ ký số
     try:
@@ -76,8 +79,6 @@ async def upload_file(
     # Step 4: Lưu file và metadata
     try:
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-
-        # Trích CN (Common Name) từ subject để làm định danh
         subject = cert.subject
         cn_attr = subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)
         bank_cn = cn_attr[0].value if cn_attr else "unknown"

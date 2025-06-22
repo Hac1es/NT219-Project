@@ -7,8 +7,12 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography import x509
 from pathlib import Path
 
-SERVER_URL = f"https://192.168.1.12:443/upload" 
+URL_MAPPER = {
+    "MSB": "192.168.1.11",
+    "ACB": "192.168.1.12"
+}
 BANK_CODE = "MSB"  # Mã ngân hàng của bạn
+SERVER_URL = f"https://{URL_MAPPER[BANK_CODE]}/upload" 
 
 # === INPUT FILE ===
 file_path = input("Input file path: ").strip()
