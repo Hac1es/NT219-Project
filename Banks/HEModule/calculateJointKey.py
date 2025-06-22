@@ -31,18 +31,14 @@ def save_file(file_path: str, data: bytes) -> None:
         f.write(data)
 
 if __name__ == "__main__":
-    print("--- Participate in Joint Key Generation ---")
-    
     # Nhập tên ngân hàng
-    bank_name = input("Input your bank code: ").strip()
-    if not bank_name:
-        raise Exception("Bank name cannot be empty.")
+    bank_name = "MSB"
+    print(f"--- {bank_name} Participate in Joint Key Generation ---")
 
-    key_dir = f'keys_{bank_name}'
-    ensure_dir(key_dir)
+    key_dir = 'Keys'
 
     # Nhập đường dẫn đến public key trước đó (từ bank trước)
-    prev_file = input("Input path to previous publicKey file: ").strip()
+    prev_file = input("Input path to latest publicKey: ").strip()
     if not os.path.exists(prev_file):
         raise Exception(f"File '{prev_file}' does not exist.")
 
@@ -61,17 +57,22 @@ if __name__ == "__main__":
     cc.Enable(fhe.PKESchemeFeature.MULTIPARTY)    # Hỗ trợ nhiều bên
 
     # 2. Deserialize publicKey của bên trước
-    print(f"Loading public key from: {prev_file}")
+    print(f"Loading latest public key from: {prev_file}")
     publicKey, result = fhe.DeserializePublicKey(prev_file, fhe.BINARY)
     if not result:
-        raise Exception("Cannot deserialize previous public key.")
+        raise Exception("Cannot deserialize choosen public key.")
 
     # 3. Tạo cặp khóa mới dựa trên publicKey trước đó
-    print("Generating contribution to joint public key...")
+    print("Generating our contribution to joint public key...")
     keyPair = cc.MultipartyKeyGen(publicKey)
 
-    # 4. Lưu lại public key và secret key mới (có ký)
-    pub_path = os.path.join(key_dir, f"{bank_name}_publicKey.txt")
+    # 4. Lưu lại public key và secret key mới
+    # Co phai ben tong hop khong?
+    is_aggregator = input("Are you the aggregator party? (y/n): ").strip().lower()
+    if is_aggregator == 'y':
+        pub_path = os.path.join(key_dir, f"{bank_name}_publicKey.txt")
+    else:
+        pub_path = os.path.join(key_dir, f"jointPublicKey.txt")
     priv_path = os.path.join(key_dir, f"{bank_name}_privateKey.txt")
 
     # Serialize public key

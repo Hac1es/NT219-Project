@@ -1,5 +1,5 @@
 """
-File: decryptEncryptedText.py
+File: multipartyDecrypt.py
 Mô tả: Tham gia quá trình giải mã kết quả mã hóa liên ngân hàng
 Chức năng chính:
 - Giải mã từng phần ciphertext bằng private key của từng ngân hàng
@@ -10,25 +10,11 @@ Chức năng chính:
 import os
 import openfhe as fhe
 
-def ensure_dir(path):
-    """
-    Hàm tạo thư mục nếu chưa tồn tại
-    Args:
-        path: Đường dẫn thư mục cần tạo
-    """
-    if not os.path.exists(path):
-        os.makedirs(path)
+bank_name = "MSB"
 
 if __name__ == "__main__":
-    print("--- Participate in Decrypt Result ---")
-
-    # Nhập tên ngân hàng
-    bank_name = input("Input your bank code: ").strip()
-    if not bank_name:
-        raise Exception("Bank name cannot be empty.")
-
+    print(f"--- {bank_name} Participate in Decrypt Result ---")
     key_dir = f'keys_{bank_name}'
-    ensure_dir(key_dir)
 
     # Đường dẫn đến private key cá nhân
     prv_key_file = input("Input path to your private key file: ").strip()
@@ -55,7 +41,7 @@ if __name__ == "__main__":
         raise Exception("Cannot deserialize private key.")
 
     # === Giải mã kết quả mã hóa liên ngân hàng ===
-    encrypted_file = input("Path to the encrypted result file: ").strip()
+    encrypted_file = input("Path to current encrypted result file: ").strip()
     if not os.path.exists(encrypted_file):
         raise Exception(f"Encrypted file '{encrypted_file}' does not exist.")
     with open(encrypted_file, 'rb') as f:
@@ -69,20 +55,20 @@ if __name__ == "__main__":
 
 
     # Hỏi người dùng là Lead hay Main
-    role = input("Are you the 'lead' party for decryption? (y/n): ").strip().lower()
+    role = input("Are you the 'lead' bank for decryption? (y/n): ").strip().lower()
     if role == 'y':
         part_decrypt = cc.MultipartyDecryptLead([encrypted_result], privateKey)[0]
     else:
         part_decrypt = cc.MultipartyDecryptMain([encrypted_result], privateKey)[0]
 
     # Lưu phần giải mã cục bộ của bạn
-    part_dec_path = os.path.join(key_dir, "partial_decryption.txt")
+    part_dec_path = os.path.join(key_dir, f"{bank_name}_partialDecryption.txt")
     with open(part_dec_path, 'wb') as f:
         f.write(fhe.Serialize(part_decrypt, fhe.BINARY))
     print(f"Your partial decryption saved to: {part_dec_path}")
 
     # Hỏi người dùng có phải bên tập hợp kết quả không
-    is_aggregator = input("Are you the aggregator party? (y/n): ").strip().lower()
+    is_aggregator = input("Are you the aggregator bank? (y/n): ").strip().lower()
     if is_aggregator == 'y':
         print("Merging all partial decryptions...")
         num_parts = int(input("How many partial decryptions to merge?: "))
@@ -102,4 +88,4 @@ if __name__ == "__main__":
         raw_score = result_ptxt.GetRealPackedValue()[0]
         credit_score = 300 + (raw_score * 550)
         print("\n=== Final Decryption Result ===")
-        print("Decrypted value:", credit_score)
+        print("Credit score:", credit_score)

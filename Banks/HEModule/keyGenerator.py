@@ -10,15 +10,6 @@ Chức năng chính:
 import openfhe as fhe
 import os
 
-def ensure_dir(path):
-    """
-    Hàm tạo thư mục nếu chưa tồn tại
-    Args:
-        path: Đường dẫn thư mục cần tạo
-    """
-    if not os.path.exists(path):
-        os.makedirs(path)
-
 def generate_and_export_keys():
     """
     Tạo và xuất khóa mã hóa đồng hình sử dụng OpenFHE CKKS
@@ -26,13 +17,8 @@ def generate_and_export_keys():
     - Tạo cặp khóa
     - Xuất khóa ra file
     """
-     # Nhập tên ngân hàng
-    bank_name = input("Input your bank code: ").strip()
-    if not bank_name:
-        raise Exception("Bank name cannot be empty.")
-    
-    key_dir = f'keys_{bank_name}'
-    ensure_dir(key_dir)
+    bank_name = "MSB"
+    key_dir = 'Keys'
     
     # Initialize CKKS parameters
     # CKKS is a scheme that supports approximate arithmetic on encrypted real numbers
@@ -75,8 +61,8 @@ def generate_and_export_keys():
 
     # Print summary of generated files
     print("\nKeys have been generated and exported:")
-    print("- publicKey.txt")      # Used for encryption
-    print("- privateKey.txt")     # Used for decryption
+    print(f"- {key_dir}/{bank_name}_publicKey.txt")      # Used for encryption
+    print(f"- {key_dir}/{bank_name}_privateKey.txt")     # Used for decryption
 
 if __name__ == "__main__":
     generate_and_export_keys() 

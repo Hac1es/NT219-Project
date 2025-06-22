@@ -10,14 +10,7 @@ Chức năng chính:
 import os
 import openfhe as fhe
 
-def ensure_dir(path):
-    """
-    Hàm tạo thư mục nếu chưa tồn tại
-    Args:
-        path: Đường dẫn thư mục cần tạo
-    """
-    if not os.path.exists(path):
-        os.makedirs(path)
+bank_name = "MSB"
 
 def save_file(file_path: str, data: bytes) -> None:
     """
@@ -30,16 +23,9 @@ def save_file(file_path: str, data: bytes) -> None:
         f.write(data)
 
 if __name__ == "__main__":
-    print("--- Participate in Joint Key Generation ---")
+    print(f"--- {bank_name} Participate in Joint Key Generation ---")
     print("--- Stage 1: Forward Accumulation ---")
-
-    # Nhập tên ngân hàng
-    bank_name = input("Input your bank code: ").strip()
-    if not bank_name:
-        raise Exception("Bank name cannot be empty.")
-
-    key_dir = f'keys_{bank_name}'
-    ensure_dir(key_dir)
+    key_dir = 'Keys'
 
     # Nhập đường dẫn đến private key
     prv_key_file = input("Input path to your privateKey file: ").strip()
