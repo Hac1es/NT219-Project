@@ -7,14 +7,8 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography import x509
 from pathlib import Path
 
-SERVER_URL = "https://your-server/upload"  # ⚠️ Cập nhật URL của bạn
+SERVER_URL = f"https://192.168.1.12:443/upload" 
 BANK_CODE = "MSB"  # Mã ngân hàng của bạn
-
-# === INPUT TARGET BANK/ORG ===
-target_bank = input("Input target bank code: ").strip()
-if not target_bank:
-    print("Target bank code cannot be empty.")
-    exit(1)
 
 # === INPUT FILE ===
 file_path = input("Input file path: ").strip()
@@ -67,7 +61,7 @@ try:
         cert_pem = f.read()
         cert_obj = x509.load_pem_x509_certificate(cert_pem)
 except Exception as e:
-    print(f"❌ Lỗi khi đọc certificate: {e}")
+    print(f"Lỗi khi đọc certificate: {e}")
     exit(1)
 
 # === GỬI REQUEST ===
@@ -82,7 +76,7 @@ data = {
 
 try:
     print("Send request...")
-    response = requests.post(SERVER_URL, data=data, files=files, verify=True)
+    response = requests.post(SERVER_URL, data=data, files=files, verify="./RootCA.crt")
     print(f"✅ Server response({response.status_code}):\n{response.text}")
 except Exception as e:
     print(f"Lỗi khi gửi HTTPS request: {e}")
