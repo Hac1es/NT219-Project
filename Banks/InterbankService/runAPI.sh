@@ -4,7 +4,7 @@ source ../../venv/bin/activate
 # ========================
 # ⚙️ CONFIG
 # ========================
-BANK_NAME = "ACB"
+BANK_NAME="ACB"
 APP_MODULE="interbankAPI:app"
 HOST="0.0.0.0"
 PORT=443
