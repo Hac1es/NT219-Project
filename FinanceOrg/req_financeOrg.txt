@@ -1,0 +1,25 @@
+# FinanceOrg Module Requirements
+# Used by: HEServer.py (Homomorphic Encryption Credit Score Server)
+
+# Core dependencies
+cryptography==45.0.3
+fastapi==0.115.12
+numpy==2.2.6
+openfhe==1.3.0.0.24.4
+uvicorn==0.34.3
+
+# FastAPI dependencies
+anyio==4.9.0
+h11==0.16.0
+pydantic==2.11.5
+pydantic_core==2.33.2
+python-multipart==0.0.20
+sniffio==1.3.1
+starlette==0.46.2
+
+# Cryptography dependencies
+cffi==1.17.1
+pycparser==2.22
+
+# Other dependencies
+typing_extensions==4.14.0 

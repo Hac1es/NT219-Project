@@ -1,0 +1,15 @@
+# CA Module Requirements
+# Used by: CA/server.py (Certificate Authority Server)
+
+# FastAPI dependencies
+fastapi==0.115.12
+anyio==4.9.0
+h11==0.16.0
+pydantic==2.11.5
+pydantic_core==2.33.2
+python-multipart==0.0.20
+sniffio==1.3.1
+starlette==0.46.2
+
+# Other dependencies
+typing_extensions==4.14.0 
