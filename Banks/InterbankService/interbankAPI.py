@@ -28,6 +28,17 @@ def verify_certificate_signed_by_root(cert: x509.Certificate, root_cert: x509.Ce
         return True
     except Exception:
         return False
+    
+# Danh sách IP cho phép: MSB, ACB, FECREDIT
+ALLOWED_IPS = {"192.168.1.11", "192.168.1.12", "192.168.1.14"}  
+
+@app.middleware("http")
+async def verify_client_ip(request: Request, call_next):
+    client_ip = request.client.host
+    if client_ip not in ALLOWED_IPS:
+        raise HTTPException(status_code=403, detail="Forbidden: IP not allowed")
+    response = await call_next(request)
+    return response
 
 @app.post("/upload")
 async def upload_file(

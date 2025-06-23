@@ -61,7 +61,8 @@ response = requests.post(
     "csr": (f"{commonname}.csr", open(csr_path, "rb"), "application/pkcs10"),
     "config": (f"{commonname}.cnf", open(config_path, "rb"), "text/plain")
     },
-    verify="./RootCA.crt"
+    verify="./RootCA.crt",
+    timeout=(10, 300)
 )
 
 # === 6. Nhận và lưu cert nếu thành công ===

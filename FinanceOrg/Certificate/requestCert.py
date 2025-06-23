@@ -37,7 +37,8 @@ SERVER_URL = f"https://{server_IP}:443/submit-csr"
 response = requests.post(
     SERVER_URL,
     files={"csr": (f"{commonname}.csr", csr_data, "application/pkcs10")},
-    verify=False
+    verify="./RootCA.crt",
+    timeout=(10, 300)
 )
 
 if response.status_code == 200:

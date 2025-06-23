@@ -81,7 +81,7 @@ data = {
 
 try:
     print("Send request...")
-    response = requests.post(SERVER_URL, data=data, files=files, verify="./RootCA.crt")
+    response = requests.post(SERVER_URL, data=data, files=files, verify="./RootCA.crt", timeout=(10, 300))
     print(f"✅ Server response({response.status_code}):\n{response.text}")
 except Exception as e:
     print(f"Lỗi khi gửi HTTPS request: {e}")

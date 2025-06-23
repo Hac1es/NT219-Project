@@ -5,6 +5,9 @@ from pathlib import Path
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.exceptions import InvalidSignature
+from requests_toolbelt.multipart import decoder
 
 # === CẤU HÌNH ===
 URL_MAPPER = {
@@ -13,9 +16,10 @@ URL_MAPPER = {
 # Endpoint trên server nhận
 API_ENDPOINT = "/calculate-credit-score"
 
+ROOT_CA_PATH = "./RootCA.crt" 
+
 # Danh sách các "key" của file mà server mong đợi
 REQUIRED_FILE_KEYS = [
-    'public_key',
     'eval_mult_key',
     'S_payment',
     'S_util',
@@ -126,18 +130,81 @@ data_to_send = {
 
 try:
     print(f"Sending request...")
-    response = requests.post(SERVER_URL, data=data_to_send, files=files_to_send, verify="./RootCA.crt")
+    response = requests.post(SERVER_URL, data=data_to_send, files=files_to_send, verify="./RootCA.crt", timeout=(10, 300))
     
     print(f"Server response with status code: {response.status_code}")
 
     if response.status_code == 200:
-        output_filename = 'Received/encryptedResult.txt'
+        print("\n--- Verifying response from server ---")
+        
+        # 1. Parse multipart response
+        try:
+            multipart_data = {}
+            # Dùng decoder để tách các part ra
+            for part in decoder.MultipartDecoder.from_response(response).parts:
+                # Lấy tên của part từ header 'Content-Disposition'
+                disposition = part.headers[b'Content-Disposition'].decode()
+                name = [p.split('=')[1].strip('"') for p in disposition.split(';') if 'name=' in p][0]
+                multipart_data[name] = part.content # Lưu nội dung (bytes)
+
+            # Lấy dữ liệu từ dict đã parse
+            result_bytes = multipart_data['result_data']
+            server_signature_bytes = multipart_data['server_signature']
+            server_cert_pem_bytes = multipart_data['server_certificate']
+            print("OK: Multipart response package parsed successfully.")
+        except Exception as e:
+            print(f"CRITICAL: Could not parse server's multipart response. Aborting. Error: {e}")
+            exit(1)
+
+        # 2. LỚP BẢO VỆ 1: Kiểm tra cert của server (logic không đổi)
+        try:
+            print("Step 1: Verifying server's certificate against RootCA...")
+            with open(ROOT_CA_PATH, "rb") as f:
+                root_cert = x509.load_pem_x509_certificate(f.read())
+            
+            server_cert = x509.load_pem_x509_certificate(server_cert_pem_bytes)
+            
+            root_cert.public_key().verify(
+                server_cert.signature,
+                server_cert.tbs_certificate_bytes,
+                ec.ECDSA(server_cert.signature_hash_algorithm)
+            )
+            print("OK: Server's certificate is trusted.")
+        except Exception as e:
+            print(f"CRITICAL: Server's certificate cannot be trusted! Aborting. Reason: {e}")
+            exit(1)
+            
+        # 3. LỚP BẢO VỆ 2: Kiểm tra chữ ký của server (logic không đổi)
+        try:
+            print("Step 2: Verifying server's signature on the result data...")
+            server_public_key = server_cert.public_key()
+            
+            server_public_key.verify(
+                server_signature_bytes, # Dùng trực tiếp bytes
+                result_bytes,           # Dùng trực tiếp bytes
+                ec.ECDSA(hashes.SHA256())
+            )
+            print("OK: Server's signature is valid. Response is authentic and integral.")
+        except InvalidSignature:
+            print("CRITICAL: Invalid signature from server! Response may have been tampered with. Aborting.")
+            exit(1)
+        except Exception as e:
+            print(f"CRITICAL: An error occurred while verifying server signature. Aborting. Reason: {e}")
+            exit(1)
+
+        # 4. Chỉ khi TẤT CẢ đều OK, mới lưu file
+        output_dir = Path("Received")
+        output_dir.mkdir(exist_ok=True)
+        output_filename = output_dir / 'encryptedResult.bin'
+        
         with open(output_filename, 'wb') as f:
-            f.write(response.content)
-        print(f"Result have been saved in '{output_filename}'")
+            f.write(result_bytes)
+        print(f"\nSuccess! Verified result has been saved to '{output_filename}'")
+        
     else:
-        print("Yêu cầu thất bại. Chi tiết lỗi từ server:")
+        print("Request failed. Server error details:")
         print(response.text)
+
 
 except requests.exceptions.RequestException as e:
     print(f"Lỗi nghiêm trọng khi gửi request: {e}")

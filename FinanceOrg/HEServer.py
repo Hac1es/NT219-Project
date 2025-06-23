@@ -1,22 +1,20 @@
 import os
 import json
 import base64
-import shutil
-import tempfile
 import logging
 import traceback
-from pathlib import Path
-from typing import Dict, List, Any
-
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException
-from fastapi.responses import Response, JSONResponse
-
+from typing import Dict, Any
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request
+from fastapi.responses import Response
 import openfhe as fhe
 import numpy as np
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.exceptions import InvalidSignature
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 
 # --- CONFIGURATION ---
 logging.basicConfig(level=logging.INFO)
@@ -25,6 +23,9 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="Secure Homomorphic Credit Score Server")
 
 CUSTOM_CA_PATH = "./Certificate/RootCA.crt" 
+SERVER_KEY_PATH = "./Certificate/FECREDIT.key"
+SERVER_CERT_PATH = "./Certificate/FECREDIT.crt"
+
 if not os.path.exists(CUSTOM_CA_PATH):
     raise FileNotFoundError(f"RootCA file not found at: {CUSTOM_CA_PATH}")
 
@@ -142,10 +143,21 @@ def init_crypto_context():
     cc.Enable(fhe.PKESchemeFeature.MULTIPARTY)
     return cc
 
+# Danh sách IP cho phép: MSB, ACB, FECREDIT
+ALLOWED_IPS = {"192.168.1.11", "192.168.1.12", "192.168.1.14"}  
+
+@app.middleware("http")
+async def verify_client_ip(request: Request, call_next):
+    client_ip = request.client.host
+    if client_ip not in ALLOWED_IPS:
+        raise HTTPException(status_code=403, detail="Forbidden: IP not allowed")
+    response = await call_next(request)
+    return response
+
 # --- MAIN API ENDPOINT ---
 @app.post("/calculate-credit-score")
 async def calculate_credit_score(
-    public_key: UploadFile = File(...), eval_mult_key: UploadFile = File(...),
+    eval_mult_key: UploadFile = File(...),
     S_payment: UploadFile = File(...), S_util: UploadFile = File(...), S_length: UploadFile = File(...),
     S_creditmix: UploadFile = File(...), S_inquiries: UploadFile = File(...),
     S_behavioral: UploadFile = File(...), S_incomestability: UploadFile = File(...),
@@ -157,7 +169,7 @@ async def calculate_credit_score(
     
     # Gom tất cả các file dữ liệu FHE vào một dict riêng
     fhe_data_files = {
-        'public_key': public_key, 'eval_mult_key': eval_mult_key,
+        'eval_mult_key': eval_mult_key,
         'S_payment': S_payment, 'S_util': S_util, 'S_length': S_length,
         'S_creditmix': S_creditmix, 'S_inquiries': S_inquiries,
         'S_behavioral': S_behavioral, 'S_incomestability': S_incomestability
@@ -231,8 +243,6 @@ async def calculate_credit_score(
     logger.info("Security checks passed. Starting homomorphic computation.")
     try:
         cc = init_crypto_context()
-        fhe_pk, success = fhe.DeserializePublicKeyString(file_contents['public_key'], fhe.BINARY)
-        if not success: raise ValueError("Invalid FHE public key")
         
         eval_mult_key = fhe.DeserializeEvalKeyString(file_contents['eval_mult_key'], fhe.BINARY)
         if not isinstance(eval_mult_key, fhe.EvalKey): raise ValueError("Invalid FHE evaluation key")
@@ -255,17 +265,66 @@ async def calculate_credit_score(
         result_data = fhe.Serialize(encrypted_result, fhe.BINARY)
         if not result_data:
             raise HTTPException(status_code=500, detail="Failed to serialize FHE result.")
-        
-        logger.info("Computation successful. Returning encrypted result.")
-        return Response(
-            content=result_data,
-            media_type="application/octet-stream",
-            headers={"Content-Disposition": "attachment; filename=encrypted_result.bin"}
-        )
 
     except Exception as e:
         logger.error(f"Error during FHE processing: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"An error occurred during homomorphic computation: {e}")
+    
+    # === PHẦN 3: KÝ VÀ TẠO MULTIPART RESPONSE ===
+    logger.info("Signing the response and preparing multipart package...")
+    try:
+        # 1. Load private key và certificate của SERVER
+        with open(SERVER_KEY_PATH, "rb") as f:
+            server_private_key = serialization.load_pem_private_key(f.read(), password=None)
+        with open(SERVER_CERT_PATH, "rb") as f:
+            server_cert_pem_bytes = f.read()
+
+        # 2. Dữ liệu cần ký là kết quả FHE
+        data_to_sign = result_data
+        
+        # 3. Tạo chữ ký
+        server_signature_bytes = server_private_key.sign(
+            data_to_sign,
+            ec.ECDSA(hashes.SHA256())
+        )
+
+        # 4. Tạo gói multipart
+        multipart_payload = MIMEMultipart()
+        
+        # Part 1: Kết quả FHE (dữ liệu chính)
+        part_result = MIMEBase('application', 'octet-stream')
+        part_result.set_payload(result_data)
+        encoders.encode_base64(part_result)
+        part_result.add_header('Content-Disposition', 'form-data; name="result_data"; filename="encryptedResult.bin"')
+        multipart_payload.attach(part_result)
+
+        # Part 2: Chữ ký của server
+        part_signature = MIMEBase('application', 'octet-stream')
+        part_signature.set_payload(server_signature_bytes)
+        encoders.encode_base64(part_signature)
+        part_signature.add_header('Content-Disposition', 'form-data; name="server_signature"; filename="signature.sig"')
+        multipart_payload.attach(part_signature)
+
+        # Part 3: Certificate của server
+        part_cert = MIMEBase('application', 'x-x509-ca-cert')
+        part_cert.set_payload(server_cert_pem_bytes)
+        encoders.encode_base64(part_cert)
+        part_cert.add_header('Content-Disposition', 'form-data; name="server_certificate"; filename="server.crt"')
+        multipart_payload.attach(part_cert)
+
+        # 5. Lấy toàn bộ body và headers từ đối tượng multipart
+        multipart_body = multipart_payload.as_bytes()
+        # Tách phần headers và body thực sự
+        headers, body = multipart_body.split(b'\n\n', 1)
+        # Tạo headers cho response, quan trọng nhất là Content-Type với boundary
+        response_headers = {h.split(b':', 1)[0].decode(): h.split(b':', 1)[1].strip().decode() for h in headers.split(b'\n')}
+
+        logger.info("Multipart response created. Sending back to client.")
+        return Response(content=body, media_type=response_headers['Content-Type'])
+
+    except Exception as e:
+        logger.error(f"FATAL: Could not create or sign the multipart response: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail="Server failed to prepare the response.")
 
 # --- KHỞI CHẠY SERVER VỚI HTTPS ---
 if __name__ == "__main__":
