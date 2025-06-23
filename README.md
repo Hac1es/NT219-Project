@@ -110,7 +110,7 @@ NT219_Project/
 
 - Multiparty CKKS (FHE) cho tính toán bảo mật
 - ECDSA cho chữ ký số
-- TLS/SSL cho truyền tải
+- HTTPS/TLSv1.3 cho truyền tải
 - PostgreSQL TDE cho dữ liệu at-rest
 
 ### 2. Xác thực & quyền truy cập:
