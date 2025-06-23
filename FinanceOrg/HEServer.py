@@ -12,9 +12,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.exceptions import InvalidSignature
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email import encoders
+import uuid
 
 # --- CONFIGURATION ---
 logging.basicConfig(level=logging.INFO)
@@ -55,7 +53,7 @@ def get_B(crypto_context, S_creditmix, S_incomestability):
     result = crypto_context.EvalChebyshevFunction(
         func=lambda x: np.sqrt(x),
         ciphertext=total,
-        a=1.0,
+        a=1.0, 
         b=3.0,
         degree=15
     )
@@ -273,55 +271,44 @@ async def calculate_credit_score(
     # === PHẦN 3: KÝ VÀ TẠO MULTIPART RESPONSE ===
     logger.info("Signing the response and preparing multipart package...")
     try:
-        # 1. Load private key và certificate của SERVER
+        # 1. Load private key và certificate của SERVER (không đổi)
         with open(SERVER_KEY_PATH, "rb") as f:
             server_private_key = serialization.load_pem_private_key(f.read(), password=None)
         with open(SERVER_CERT_PATH, "rb") as f:
             server_cert_pem_bytes = f.read()
 
-        # 2. Dữ liệu cần ký là kết quả FHE
+        # 2. Dữ liệu cần ký là kết quả FHE (không đổi)
         data_to_sign = result_data
         
-        # 3. Tạo chữ ký
+        # 3. Tạo chữ ký (không đổi)
         server_signature_bytes = server_private_key.sign(
             data_to_sign,
             ec.ECDSA(hashes.SHA256())
         )
+        # 1. Tạo boundary
+        boundary = f"----Boundary{uuid.uuid4().hex}"
 
-        # 4. Tạo gói multipart
-        multipart_payload = MIMEMultipart()
-        
-        # Part 1: Kết quả FHE (dữ liệu chính)
-        part_result = MIMEBase('application', 'octet-stream')
-        part_result.set_payload(result_data)
-        encoders.encode_base64(part_result)
-        part_result.add_header('Content-Disposition', 'form-data; name="result_data"; filename="encryptedResult.bin"')
-        multipart_payload.attach(part_result)
+        # 2. Hàm tạo từng phần
+        def create_part(name, filename, content_type, content: bytes):
+            return (
+                f"--{boundary}\r\n"
+                f"Content-Disposition: form-data; name=\"{name}\"; filename=\"{filename}\"\r\n"
+                f"Content-Type: {content_type}\r\n"
+                f"\r\n"   
+            ).encode('utf-8') + content + b"\r\n"
 
-        # Part 2: Chữ ký của server
-        part_signature = MIMEBase('application', 'octet-stream')
-        part_signature.set_payload(server_signature_bytes)
-        encoders.encode_base64(part_signature)
-        part_signature.add_header('Content-Disposition', 'form-data; name="server_signature"; filename="signature.sig"')
-        multipart_payload.attach(part_signature)
+        # 3. Gộp các phần
+        body = b''
+        body += create_part("result_data", "encryptedResult.bin", "application/octet-stream", result_data)
+        body += create_part("server_signature", "signature.sig", "application/octet-stream", server_signature_bytes)
+        body += create_part("server_certificate", "server.crt", "application/x-x509-ca-cert", server_cert_pem_bytes)
+        body += f"--{boundary}--\r\n".encode('utf-8')
 
-        # Part 3: Certificate của server
-        part_cert = MIMEBase('application', 'x-x509-ca-cert')
-        part_cert.set_payload(server_cert_pem_bytes)
-        encoders.encode_base64(part_cert)
-        part_cert.add_header('Content-Disposition', 'form-data; name="server_certificate"; filename="server.crt"')
-        multipart_payload.attach(part_cert)
-
-        # 5. Lấy toàn bộ body và headers từ đối tượng multipart
-        multipart_body = multipart_payload.as_bytes()
-        # Tách phần headers và body thực sự
-        headers, body = multipart_body.split(b'\n\n', 1)
-        # Tạo headers cho response, quan trọng nhất là Content-Type với boundary
-        response_headers = {h.split(b':', 1)[0].decode(): h.split(b':', 1)[1].strip().decode() for h in headers.split(b'\n')}
-
-        logger.info("Multipart response created. Sending back to client.")
-        return Response(content=body, media_type=response_headers['Content-Type'])
-
+        # 4. Trả về multipart response
+        return Response(
+            content=body,
+            media_type=f"multipart/form-data; boundary={boundary}"
+        )        
     except Exception as e:
         logger.error(f"FATAL: Could not create or sign the multipart response: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail="Server failed to prepare the response.")
