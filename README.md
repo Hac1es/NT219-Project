@@ -7,6 +7,8 @@ Hệ thống tính toán điểm tín dụng bảo mật sử dụng Multiparty 
 
 ## KIẾN TRÚC HỆ THỐNG
 
+![FHE Credit Score Architecture](diagram.png)
+
 ## CẤU TRÚC THƯ MỤC
 
 ```
