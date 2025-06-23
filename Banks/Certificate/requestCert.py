@@ -6,9 +6,23 @@ import os
 country = "VN"
 state = "Ha Noi"
 org = "Maritime Bank"
-commonname = "MSB"
 public_ip = "192.168.1.11"
 server_domain = "www.sbv.org"
+
+def load_context(path="../context.txt"):
+    context = {}
+    try:
+        with open(path, "r") as f:
+            for line in f:
+                if "=" in line:
+                    k, v = line.strip().split("=", 1)
+                    context[k.strip()] = v.strip()
+    except Exception:
+        pass
+    return context
+
+context = load_context()
+commonname = context.get("BANK_CODE", commonname)
 
 # === 1. Tạo file config tạm có SAN ===
 with tempfile.NamedTemporaryFile("w", suffix=".cnf", delete=False) as config_file:

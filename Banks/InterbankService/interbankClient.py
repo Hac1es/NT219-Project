@@ -11,8 +11,22 @@ URL_MAPPER = {
     "MSB": "192.168.1.11",
     "ACB": "192.168.1.12"
 }
-BANK_CODE = "MSB"  # Mã ngân hàng của bạn
-BANK_TARGET="ACB"
+
+def load_context(path="../context.txt"):
+    context = {}
+    try:
+        with open(path, "r") as f:
+            for line in f:
+                if "=" in line:
+                    k, v = line.strip().split("=", 1)
+                    context[k.strip()] = v.strip()
+    except Exception:
+        pass
+    return context
+
+context = load_context()
+BANK_CODE = context.get("BANK_CODE", "MSB")
+BANK_TARGET = context.get("TARGET_BANK", "ACB")
 SERVER_URL = f"https://{URL_MAPPER[BANK_TARGET]}/upload" 
 
 # === INPUT FILE ===
