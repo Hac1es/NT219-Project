@@ -5,13 +5,10 @@
 Hệ thống tính toán điểm tín dụng bảo mật sử dụng Multiparty CKKS cho phép nhiều bên cùng nhau hợp tác
 để tính toán trên dữ liệu đã mã hóa mà không cần giải mã, đảm bảo tính riêng tư và bảo mật dữ liệu tuyệt đối.
 
-## DEMO HỆ THỐNG
+## KIẾN TRÚC HỆ THỐNG (Ấn vào hình để xem video demo)
 
 [![Xem demo](diagram.png)](https://www.youtube.com/watch?v=zf33MT_4sFw)
 
-## KIẾN TRÚC HỆ THỐNG
-
-![FHE Credit Score Architecture](diagram.png)
 
 ## CẤU TRÚC THƯ MỤC
 
