@@ -1,0 +1,50 @@
+# Gõ Tiếng Việt:
+sudo add-apt-repository ppa:bamboo-engine/ibus-bamboo
+sudo apt-get update
+sudo apt-get install ibus ibus-bamboo --install-recommends
+ibus restart
+env DCONF_PROFILE=ibus dconf write /desktop/ibus/general/preload-engines "['BambooUs', 'Bamboo']" && gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'us'), ('ibus', 'Bamboo')]"
+GNOME
+Truy cập cấu hình bộ gõ Settings > Keyboard > Input Sources.
+Thiết lập 2 bộ gõ gồm English (US) và Vietnamese (Bamboo).
+Trong mục Options chọn Allow different sources for each window để tự chuyển đổi bộ gõ khi vào các ứng dụng khác nhau.
+
+# Setup:
+# IP tĩnh:
+sudo mv /etc/netplan/50-cloud-init.yaml /etc/netplan/50-cloud-init.yaml.old
+sudo nano /etc/netplan/50-cloud-init.yaml
+# Ubuntu Static IP Configuration
+network:
+    version: 2
+    ethernets:
+        ens33:
+            dhcp4: no
+            addresses:
+                     - 192.168.1.11/24
+            gateway4: 192.168.1.1
+            nameservers:
+                addresses:
+                   - 8.8.8.8
+sudo rm /etc/netplan/01-network-manager-all.yaml
+sudo netplan apply
+
+# Bật IP động:
+sudo mv /etc/netplan/50-cloud-init.yaml /etc/netplan/50-cloud-init.yaml.static
+sudo mv /etc/netplan/50-cloud-init.yaml.old /etc/netplan/50-cloud-init.yaml
+sudo netplan apply
+
+# Bật IP tĩnh:
+sudo mv /etc/netplan/50-cloud-init.yaml /etc/netplan/50-cloud-init.yaml.old
+sudo mv /etc/netplan/50-cloud-init.yaml.static /etc/netplan/50-cloud-init.yaml
+sudo netplan apply
+
+# DNS:
+sudo nano /etc/hosts
+192.168.1.10   www.sbv.org
+
+# Setup
+sudo apt update
+sudo apt install -y libxcb-cursor0 libxcb-xinerama0 libxcb-xinput0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxkbcommon-x11-0 libssl-dev libpq-dev
+
+openssl x509 -in MSB.crt -noout -text
+openssl x509 -in ACB.crt -noout -text

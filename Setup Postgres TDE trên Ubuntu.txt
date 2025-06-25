@@ -1,0 +1,106 @@
+wget https://download.cybertec-postgresql.com/postgresql-12.3_TDE_1.0.tar.gz
+tar xvfz postgresql-12.3_TDE_1.0.tar.gz
+sudo apt update
+sudo apt install libldap2-dev libperl-dev python-dev-is-python3 build-essential python3-distutils-extra libreadline-dev zlib1g-dev libssl-dev bison flex -y
+cd postgresql-12.3_TDE_1.0
+./configure --prefix=/usr/local/pg12tde --with-openssl --with-perl  --with-python --with-ldap
+sudo make install
+cd contrib
+sudo make install
+cd /usr/local/bin
+openssl rand -hex 16
+MSB: 63f0019b421968d05de41a938662fd1c
+ACB: 1a8160905a57248d931ce1533e1bc7eb
+nano providekey.sh
+sudo chmod +x /usr/local/bin/providekey.sh
+sudo chown root:root /usr/local/bin/providekey.sh
+sudo chmod 500 /usr/local/bin/providekey.sh
+sudo adduser --disabled-password --gecos "" postgres
+sudo visudo
+postgres ALL=(ALL) NOPASSWD: /usr/local/bin/providekey.sh
+sudo mkdir -p /usr/local/postgres
+sudo chown postgres:postgres /usr/local/postgres
+sudo chmod 775 /usr/local/postgres
+sudo su - postgres
+export PATH=$PATH:/usr/local/pg12tde/bin
+initdb -D /usr/local/postgres -K "sudo /usr/local/bin/providekey.sh"
+nano ~/.bashrc
+export PATH=$PATH:/usr/local/pg12tde/bin
+pg_ctl -D /usr/local/postgres -l logfile start
+
+# Sau này khởi động:
+sudo - su postgres
+pg_ctl -D /usr/local/postgres -l logfile start
+psql
+
+#Tạo DB và bang:
+create database msb_db;
+exit
+psql -d msb_db
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE TABLE Customer (
+    CustomerID UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    Name TEXT,
+    Age TEXT
+);
+
+CREATE TABLE Data (
+    CustomerID UUID REFERENCES Customer(CustomerID) ON DELETE CASCADE,
+    Spayment DOUBLE PRECISION CHECK (Spayment BETWEEN 0.0 AND 1.0),
+    Sutil DOUBLE PRECISION CHECK (Sutil BETWEEN 0.0 AND 1.0),
+    Slength DOUBLE PRECISION CHECK (Slength BETWEEN 0.0 AND 1.0),
+    Screditmix DOUBLE PRECISION CHECK (Screditmix BETWEEN 0.0 AND 1.0),
+    Sinquiries DOUBLE PRECISION CHECK (Sinquiries BETWEEN 0.0 AND 1.0),
+    Sincomestability DOUBLE PRECISION CHECK (Sincomestability BETWEEN 0.0 AND 1.0),
+    Sbehaviorial DOUBLE PRECISION CHECK (Sbehaviorial BETWEEN 0.0 AND 1.0)
+);
+
+INSERT INTO Customer (Name, Age) VALUES
+('Phạm Minh Huy', '26'),
+('Nguyễn Thị Thanh Hương', '34'),
+('Lê Tuấn Kiệt', '22'),
+('Trần Thị Mai Lan', '29'),
+('Võ Thành Đạt', '38'),
+('Đặng Ngọc Bích', '31'),
+('Hoàng Anh Dũng', '27'),
+('Ngô Thị Kim Chi', '25'),
+('Bùi Văn Toàn', '30'),
+('Tạ Thu Trang', '24');
+
+MSB:
+INSERT INTO Data SELECT CustomerID, 0.8, 0.7, 0.6, 0.0, 0.0, 0.5, 0.0 FROM Customer WHERE Name = 'Phạm Minh Huy';
+INSERT INTO Data SELECT CustomerID, 0.0, 0.0, 0.0, 0.0, 0.9, 0.8, 0.7 FROM Customer WHERE Name = 'Nguyễn Thị Thanh Hương';
+INSERT INTO Data SELECT CustomerID, 0.9, 0.0, 0.8, 0.7, 0.0, 0.0, 0.6 FROM Customer WHERE Name = 'Lê Tuấn Kiệt';
+INSERT INTO Data SELECT CustomerID, 0.0, 0.0, 0.0, 0.9, 0.8, 0.0, 0.7 FROM Customer WHERE Name = 'Trần Thị Mai Lan';
+INSERT INTO Data SELECT CustomerID, 0.6, 0.7, 0.8, 0.0, 0.5, 0.0, 0.0 FROM Customer WHERE Name = 'Võ Thành Đạt';
+INSERT INTO Data SELECT CustomerID, 0.0, 0.0, 0.6, 0.7, 0.0, 0.0, 0.9 FROM Customer WHERE Name = 'Đặng Ngọc Bích';
+INSERT INTO Data SELECT CustomerID, 0.5, 0.6, 0.0, 0.0, 0.8, 0.7, 0.0 FROM Customer WHERE Name = 'Hoàng Anh Dũng';
+INSERT INTO Data SELECT CustomerID, 0.9, 0.0, 0.0, 0.8, 0.7, 0.0, 0.6 FROM Customer WHERE Name = 'Ngô Thị Kim Chi';
+INSERT INTO Data SELECT CustomerID, 0.0, 0.0, 0.5, 0.0, 0.9, 0.8, 0.7 FROM Customer WHERE Name = 'Bùi Văn Toàn';
+INSERT INTO Data SELECT CustomerID, 0.6, 0.0, 0.7, 0.8, 0.0, 0.0, 0.5 FROM Customer WHERE Name = 'Tạ Thu Trang';
+
+ACB:
+INSERT INTO Data SELECT CustomerID, 0.0, 0.0, 0.0, 0.954, 0.192, 0.0, 0.363 FROM Customer WHERE Name = 'Phạm Minh Huy';
+INSERT INTO Data SELECT CustomerID, 0.846, 0.647, 0.884, 0.359, 0.0, 0.0, 0.0 FROM Customer WHERE Name = 'Nguyễn Thị Thanh Hương';
+INSERT INTO Data SELECT CustomerID, 0.0, 0.645, 0.0, 0.0, 0.531, 0.587, 0.0 FROM Customer WHERE Name = 'Lê Tuấn Kiệt';
+INSERT INTO Data SELECT CustomerID, 0.218, 0.654, 0.866, 0.0, 0.0, 0.529, 0.0 FROM Customer WHERE Name = 'Trần Thị Mai Lan';
+INSERT INTO Data SELECT CustomerID, 0.0, 0.0, 0.0, 0.965, 0.0, 0.582, 0.762 FROM Customer WHERE Name = 'Võ Thành Đạt';
+INSERT INTO Data SELECT CustomerID, 0.368, 0.264, 0.0, 0.0, 0.578, 0.656, 0.0 FROM Customer WHERE Name = 'Đặng Ngọc Bích';
+INSERT INTO Data SELECT CustomerID, 0.0, 0.0, 0.529, 0.361, 0.0, 0.0, 0.295 FROM Customer WHERE Name = 'Hoàng Anh Dũng';
+INSERT INTO Data SELECT CustomerID, 0.0, 0.876, 0.658, 0.0, 0.0, 0.377, 0.0 FROM Customer WHERE Name = 'Ngô Thị Kim Chi';
+INSERT INTO Data SELECT CustomerID, 0.279, 0.532, 0.0, 0.472, 0.0, 0.0, 0.0 FROM Customer WHERE Name = 'Bùi Văn Toàn';
+INSERT INTO Data SELECT CustomerID, 0.0, 0.293, 0.0, 0.0, 0.836, 0.539, 0.0 FROM Customer WHERE Name = 'Tạ Thu Trang';
+
+# Đặt mật khẩu:
+ALTER USER postgres WITH PASSWORD 'tung2005';
+(về root) sudo nano /usr/local/postgres/pg_hba.conf
+Đổi trust -> md5
+sudo su - postgres
+pg_ctl -D /usr/local/postgres restart
+
+# Xóa file
+Về home
+rm ~/postgresql-12.3_TDE_1.0.tar.gz
+rm -rf ~/postgresql-12.3_TDE_1.0
+
+
