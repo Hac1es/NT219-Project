@@ -5,6 +5,10 @@
 Hệ thống tính toán điểm tín dụng bảo mật sử dụng Multiparty CKKS cho phép nhiều bên cùng nhau hợp tác
 để tính toán trên dữ liệu đã mã hóa mà không cần giải mã, đảm bảo tính riêng tư và bảo mật dữ liệu tuyệt đối.
 
+## DEMO HỆ THỐNG
+
+[![Xem demo](https://img.youtube.com/vi/zf33MT_4sFw/maxresdefault.jpg)](https://www.youtube.com/watch?v=zf33MT_4sFw)
+
 ## KIẾN TRÚC HỆ THỐNG
 
 ![FHE Credit Score Architecture](diagram.png)
@@ -66,7 +70,6 @@ NT219_Project/
 - [Cài PostgreSQL hỗ trợ TDE](Setup%20Postgres%20TDE%20trên%20Ubuntu.txt)
 
 ---
-
 
 ## QUY TRÌNH HOẠT ĐỘNG
 
