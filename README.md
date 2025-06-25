@@ -8,7 +8,7 @@ Hệ thống tính toán điểm tín dụng bảo mật sử dụng Multiparty 
 ## KIẾN TRÚC HỆ THỐNG (Ấn vào hình để xem video demo)
 
 [![Xem demo](diagram.png)](https://www.youtube.com/watch?v=zf33MT_4sFw)
-
+[Kịch bản demo](Kịch%20bản.txt)
 ## CẤU TRÚC THƯ MỤC
 
 ```
