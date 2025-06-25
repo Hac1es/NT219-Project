@@ -1,3 +1,5 @@
+# Chú : Nhớ đổi các biến trong thư mục Banks đúng với tên ngân hàng đại diện. Nếu không, chương trình sẽ gặp lỗi!
+
 # Gõ Tiếng Việt:
 sudo add-apt-repository ppa:bamboo-engine/ibus-bamboo
 sudo apt-get update

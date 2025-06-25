@@ -9,7 +9,6 @@ Hệ thống tính toán điểm tín dụng bảo mật sử dụng Multiparty 
 
 [![Xem demo](diagram.png)](https://www.youtube.com/watch?v=zf33MT_4sFw)
 
-
 ## CẤU TRÚC THƯ MỤC
 
 ```
@@ -63,6 +62,10 @@ NT219_Project/
 
 ### 2. Xem các hướng dẫn kèm theo repo
 
+- [Kiến trúc hệ thống](diagram.png)
+- [Sơ đồ tài sản](Assets%20Diagram.png)
+- [Luồng mã hóa](Encrypt%20Flow.png)
+- [Luồng giải mã](Decrypt%20Flow.png)
 - [Setup Client](Setup%20Client.txt)
 - [Cài PostgreSQL hỗ trợ TDE](Setup%20Postgres%20TDE%20trên%20Ubuntu.txt)
 
