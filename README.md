@@ -7,7 +7,7 @@ Hệ thống tính toán điểm tín dụng bảo mật sử dụng Multiparty 
 
 ## DEMO HỆ THỐNG
 
-[![Xem demo](https://img.youtube.com/vi/zf33MT_4sFw/maxresdefault.jpg)](https://www.youtube.com/watch?v=zf33MT_4sFw)
+[![Xem demo](diagram.png)](https://www.youtube.com/watch?v=zf33MT_4sFw)
 
 ## KIẾN TRÚC HỆ THỐNG
 
