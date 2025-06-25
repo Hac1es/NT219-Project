@@ -8,6 +8,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.exceptions import InvalidSignature
 from requests_toolbelt.multipart import decoder
+from base64 import b64decode
 
 # === CẤU HÌNH ===
 URL_MAPPER = {
@@ -130,7 +131,7 @@ data_to_send = {
 
 try:
     print(f"Sending request...")
-    response = requests.post(SERVER_URL, data=data_to_send, files=files_to_send, verify="./RootCA.crt", timeout=(10, 300))
+    response = requests.post(SERVER_URL, data=data_to_send, files=files_to_send, verify="./RootCA.crt", timeout=(1000000, 3000000))
     
     print(f"Server response with status code: {response.status_code}")
 

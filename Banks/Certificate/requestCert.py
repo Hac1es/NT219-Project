@@ -22,7 +22,7 @@ def load_context(path="../context.txt"):
     return context
 
 context = load_context()
-commonname = context.get("BANK_CODE", commonname)
+commonname = context.get("BANK_CODE")
 
 # === 1. Tạo file config tạm có SAN ===
 with tempfile.NamedTemporaryFile("w", suffix=".cnf", delete=False) as config_file:

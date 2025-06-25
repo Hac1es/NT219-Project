@@ -14,7 +14,7 @@ bank_name = "MSB"
 
 if __name__ == "__main__":
     print(f"--- {bank_name} Participate in Decrypt Result ---")
-    key_dir = f'keys_{bank_name}'
+    key_dir = 'Keys'
 
     # Đường dẫn đến private key cá nhân
     prv_key_file = input("Input path to your private key file: ").strip()
