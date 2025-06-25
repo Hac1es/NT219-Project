@@ -1,4 +1,5 @@
 # HỆ THỐNG ĐÁNH GIÁ ĐIỂM TÍN DỤNG LIÊN NGÂN HÀNG & TỔ CHỨC TÀI CHÍNH ỨNG DỤNG HOMOMORPHIC ENCRYPTION
+Đồ án môn Mật mã học (NT219), Trường Đại học Công nghệ Thông tin
 
 ## MÔ TẢ DỰ ÁN
 
@@ -73,33 +74,33 @@ NT219_Project/
 
 ## QUY TRÌNH HOẠT ĐỘNG
 
-### 1. TẠO CHỨNG CHỈ:
+### 1. Tạo chứng chỉ:
 
 - Banks và FinanceOrg gửi yêu cầu đến CA
 - CA ký và trả lại certificate
 
-### 2. TẠO KHÓA FHE:
+### 2. Tạo khóa FHE:
 
 - Các ngân hàng phối hợp tạo khóa CKKS (public chung, private riêng)
 - Sinh các evaluation key phục vụ tính toán
 
-### 3. LƯU TRỮ DỮ LIỆU:
+### 3. Lưu trữ dữ liệu:
 
 - Lưu tại PostgreSQL đã bật TDE
 - Đảm bảo dữ liệu được mã hóa trên ổ đĩa
 
-### 4. MÃ HÓA DỮ LIỆU:
+### 4. Mã hóa dữ liệu và xác thực:
 
 - Trích xuất dữ liệu từ DB, mã hóa bằng Multiparty CKKS
 - Gửi ciphertext + chữ ký số
 
-### 5. TÍNH TOÁN ĐIỂM TÍN DỤNG:
+### 5. Tính toán điểm tín dụng:
 
 - Tổ chức tín dụng nhận dữ liệu mã hóa
 - Tính toán điểm số trực tiếp bằng FHE
 - Gửi lại kết quả (mã hóa) + chữ ký số
 
-### 6. GIẢI MÃ KẾT QUẢ:
+### 6. Giải mã kết quả:
 
 - Kiểm tra chữ ký, xác minh tính toàn vẹn
 - Các ngân hàng phối hợp giải mã kết quả
