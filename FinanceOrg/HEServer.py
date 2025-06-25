@@ -130,6 +130,29 @@ def homomorphic_credit_score(crypto_context, weights, encrypted_params):
     final_score = crypto_context.EvalMult(final_score, A_plus_inverse)
     return final_score
 
+def homomorphic_credit_score_simplified(crypto_context, weights, encrypted_params):
+    weighted_scores = []
+    S1_weighted = crypto_context.EvalMult(encrypted_params['S_payment'], crypto_context.MakeCKKSPackedPlaintext([weights['w1']]))
+    S2_weighted = crypto_context.EvalMult(encrypted_params['S_util'], crypto_context.MakeCKKSPackedPlaintext([weights['w2']]))
+    S3_weighted = crypto_context.EvalMult(encrypted_params['S_length'], crypto_context.MakeCKKSPackedPlaintext([weights['w3']]))
+    S4_weighted = crypto_context.EvalMult(encrypted_params['S_creditmix'], crypto_context.MakeCKKSPackedPlaintext([weights['w4']]))
+    S5_weighted = crypto_context.EvalMult(encrypted_params['S_inquiries'], crypto_context.MakeCKKSPackedPlaintext([weights['w5']]))
+    S6_weighted = crypto_context.EvalMult(encrypted_params['S_incomestability'], crypto_context.MakeCKKSPackedPlaintext([weights['w6']]))
+    S7_weighted = crypto_context.EvalMult(encrypted_params['S_behavioral'], crypto_context.MakeCKKSPackedPlaintext([weights['w7']]))
+    weighted_scores.append(S1_weighted)
+    weighted_scores.append(S2_weighted)
+    weighted_scores.append(S3_weighted)
+    weighted_scores.append(S4_weighted)
+    weighted_scores.append(S5_weighted)
+    weighted_scores.append(S6_weighted)
+    weighted_scores.append(S7_weighted)
+    
+    final_score = weighted_scores[0]
+    for score in weighted_scores[1:]:
+        final_score = crypto_context.EvalAdd(final_score, score)
+
+    return final_score
+
 def init_crypto_context():
     parameters = fhe.CCParamsCKKSRNS()
     parameters.SetMultiplicativeDepth(15)
@@ -260,7 +283,7 @@ async def calculate_credit_score(
         }
 
         logger.info("Calculating final encrypted score...")
-        encrypted_result = homomorphic_credit_score(cc, weights, encrypted_params)
+        encrypted_result = homomorphic_credit_score_simplified(cc, weights, encrypted_params)
 
         result_data = fhe.Serialize(encrypted_result, fhe.BINARY)
         if not result_data:
