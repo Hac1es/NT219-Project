@@ -58,16 +58,15 @@ NT219_Project/
 
 - Python 3.12
 - 4 máy ảo/thật với network isolation
+- Ubuntu 24.04 (không được là Windows, vì openfhe-python không chạy được trên đó)
 
 ### 2. Xem các hướng dẫn kèm theo repo
 
----
-
-## KHỞI CHẠY HỆ THỐNG
-
-→ Chạy các script shell hoặc Python tương ứng theo tài liệu trong từng thư mục.
+- [Setup Client](Setup%20Client.txt)
+- [Cài PostgreSQL hỗ trợ TDE](Setup%20Postgres%20TDE%20trên%20Ubuntu.txt)
 
 ---
+
 
 ## QUY TRÌNH HOẠT ĐỘNG
 
