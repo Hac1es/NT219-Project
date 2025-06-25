@@ -41,23 +41,18 @@ MSB:
 ../HEModule/Keys/evalMultKey_merged.txt
 
 ACB:
+(getCustomerInfo.py)
+(interactiveEncrypt.py)
 (interbankClient.py x 3)
 ../HEModule/ciphertext_ACB_S_behavioral.txt
 ../HEModule/ciphertext_ACB_S_creditmix.txt
 ../HEModule/ciphertext_ACB_S_inquiries.txt
 
 MSB:
+(getCustomerInfo.py)
+(interactiveEncrypt.py)
 (sendToFECredit.py)
-../InterbankService/Received/jointPublicKey.txt
 ../HEModule/Keys/evalMultKey_merged.txt
-../HEModule/ciphertext_ACB_S_payment.txt
-../HEModule/ciphertext_ACB_S_util.txt
-../HEModule/ciphertext_ACB_S_length.txt
-../HEModule/ciphertext_ACB_S_creditmix.txt
-../HEModule/ciphertext_ACB_S_inquiries.txt
-../HEModule/ciphertext_ACB_S_behavioral.txt
-../HEModule/ciphertext_ACB_S_incomestability.txt
-
 ../HEModule/ciphertext_MSB_S_payment.txt
 ../HEModule/ciphertext_MSB_S_util.txt
 ../HEModule/ciphertext_MSB_S_length.txt
