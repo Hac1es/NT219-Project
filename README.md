@@ -10,46 +10,6 @@ Hệ thống tính toán điểm tín dụng bảo mật sử dụng Multiparty 
 
 [![Xem demo](diagram.png)](https://www.youtube.com/watch?v=zf33MT_4sFw)
 [Kịch bản demo](Kịch%20bản.txt)
-## CẤU TRÚC THƯ MỤC
-
-```
-NT219_Project/
-├── CA/                               # Certificate Authority (Ngân hàng Nhà Nước)
-│   ├── server.py                     # CA server (FastAPI)
-│   ├── rootCA.crt                    # Root certificate
-│   └── runServer.sh                  # Startup script
-│
-├── Banks/                            # Ngân hàng (MSB, ACB)
-│   ├── HEModule/                     # Homomorphic Encryption
-│   │   ├── interactiveEncrypt.py
-│   │   ├── keyGenerator.py
-│   │   ├── calculateJointKey.py
-│   │   ├── evalMultKey1.py
-│   │   ├── evalMultKey2.py
-│   │   ├── multipartyDecrypt.py
-│   │   └── MainWindow.ui
-│   ├── InterbankService/            # API giao tiếp liên ngân hàng
-│   │   ├── interbankAPI.py
-│   │   ├── interbankClient.py
-│   │   └── sendToFECredit.py
-│   ├── Certificate/                 # Quản lý chứng chỉ
-│   │   └── requestCert.py
-│   └── DBService/                   # Dịch vụ cơ sở dữ liệu
-│       └── getCustomerInfo.py
-│
-├── FinanceOrg/                       # Tổ chức tài chính (FE Credit)
-│   ├── HEServer.py                   # Server tính điểm tín dụng
-│   └── Certificate/
-│       └── requestCert.py
-│
-├── Testing/                          # Testing và Benchmark
-│   ├── PoC.py                        # Proof of Concept
-│   ├── PoC_benchmark.py              # Performance testing
-│   └── benchmark_results/
-│
-├── requirements.txt                  # Dependencies chính
-└── README.txt                        # File này
-```
 
 ---
 
