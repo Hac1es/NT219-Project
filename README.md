@@ -1,4 +1,4 @@
-# HỆ THỐNG ĐÁNH GIÁ ĐIỂM TÍN DỤNG LIÊN NGÂN HÀNG & TỔ CHỨC TÀI CHÍNH
+## HỆ THỐNG ĐÁNH GIÁ ĐIỂM TÍN DỤNG LIÊN NGÂN HÀNG & TỔ CHỨC TÀI CHÍNH
 Đồ án môn Mật mã học (NT219), Trường Đại học Công nghệ Thông tin
 
 ## MÔ TẢ DỰ ÁN
